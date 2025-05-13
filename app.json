@@ -25,7 +25,13 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "shortName": "MonKoach",
+      "description": "Votre coach personnel pour atteindre vos objectifs.",
+      "lang": "fr-FR",
+      "display": "standalone",
+      "themeColor": "#DFF6ED",
+      "backgroundColor": "#FFFFFF"
     },
     "plugins": [
       "expo-router",
