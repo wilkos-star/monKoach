@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send } from 'lucide-react-native'; // Keep Send, remove Loader2 if unused or handle loading differently
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Linking, ViewStyle, TextStyle, Alert, useWindowDimensions } from 'react-native'; // Import React Native components & Linking & Alert
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Linking, ViewStyle, TextStyle, useWindowDimensions, Modal, Pressable } from 'react-native'; // Import React Native components & Linking & Alert & Modal & Pressable
 import { SafeAreaView } from 'react-native-safe-area-context'; // Importer SafeAreaView
 import ReactMarkdown from 'react-native-markdown-display'; // Use react-native-markdown-display
 import { supabase } from '@/lib/supabase'; // Adjust this path if your supabase client is elsewhere
@@ -182,6 +182,63 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
     sendButtonDisabled: {
       backgroundColor: colors.tabIconDefault, // Couleur désactivée (ex: muted)
     },
+    // Modal Styles
+    centeredView: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)', 
+    },
+    modalView: {
+        margin: 20,
+        backgroundColor: colors.card,
+        borderRadius: 10,
+        padding: 25,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+        width: Platform.OS === 'web' ? '50%' : '85%', 
+        maxWidth: 400,
+        borderColor: colors.borderColor,
+        borderWidth: 1,
+    },
+    modalTitleText: {
+        marginBottom: 15,
+        textAlign: 'center',
+        fontSize: isWideScreen ? 19 : 18,
+        fontWeight: 'bold',
+        color: colors.textPrimary,
+    },
+    modalMessageText: {
+        marginBottom: 20,
+        textAlign: 'center',
+        fontSize: isWideScreen ? 17 : 16,
+        color: colors.text,
+        lineHeight: 22,
+    },
+    modalButton: { 
+        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        elevation: 2,
+        width: '100%', 
+        alignItems: 'center',
+    },
+    buttonConfirm: { 
+        backgroundColor: colors.tint, 
+    },
+    modalButtonText: { 
+        color: colors.buttonText, 
+        fontWeight: 'bold',
+        textAlign: 'center',
+        fontSize: isWideScreen ? 16 : 15,
+    },
   });
 };
 
@@ -204,6 +261,18 @@ const ChatInterface: React.FC = () => {
   const styles = getStyles(colorScheme, width); // Pass width to styles
   const markdownStyles = getMarkdownStyles(Colors[colorScheme], width); // Pass width to markdown styles
 
+  // Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+
+  // Helper to show modal
+  const showModal = (title: string, message: string) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalVisible(true);
+  };
+
   const scrollToBottom = () => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   };
@@ -223,7 +292,7 @@ const ChatInterface: React.FC = () => {
           console.warn("Could not clear prefill param: ", e)
       }
     }
-  }, [prefill]);
+  }, [prefill, router]);
 
   const sendMessage = async () => {
     if (inputValue.trim() === '') return;
@@ -246,7 +315,7 @@ const ChatInterface: React.FC = () => {
 
       if (userError || !user) {
         console.error('Error fetching user:', userError);
-        Alert.alert("Erreur", "Impossible de récupérer les informations utilisateur.");
+        showModal("Erreur", "Impossible de récupérer les informations utilisateur.");
         // Optional: add back the user message input or handle differently
         setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
         setIsLoading(false);
@@ -288,7 +357,7 @@ const ChatInterface: React.FC = () => {
     } catch (error) {
       console.error('Error sending message:', error);
       // Handle error (e.g., show an alert or a specific error message component)
-      Alert.alert("Problème de connexion", "Je rencontre des difficultés à me connecter. Réessaie plus tard !"); // Use Alert
+      showModal("Problème de connexion", "Je rencontre des difficultés à me connecter. Réessaie plus tard !"); // Use Alert
 
       // Optional: Add back the failed user message or indicate failure
       // setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
@@ -301,6 +370,26 @@ const ChatInterface: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <Modal
+          animationType="fade"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(!modalVisible)}
+      >
+          <View style={styles.centeredView}>
+              <View style={styles.modalView}>
+                  <Text style={styles.modalTitleText}>{modalTitle}</Text>
+                  <Text style={styles.modalMessageText}>{modalMessage}</Text>
+                  <Pressable
+                      style={[styles.modalButton, styles.buttonConfirm]}
+                      onPress={() => setModalVisible(!modalVisible)}
+                  >
+                      <Text style={styles.modalButtonText}>OK</Text>
+                  </Pressable>
+              </View>
+          </View>
+      </Modal>
+
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "padding"}

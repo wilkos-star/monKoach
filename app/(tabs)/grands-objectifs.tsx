@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl, Image, TouchableOpacity, Alert, useWindowDimensions, Platform } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl, Image, TouchableOpacity, useWindowDimensions, Platform, Modal, Pressable } from 'react-native';
 import { getGrandsObjectifs, updateGrandObjectifStatus } from '@/lib/supabase';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -35,33 +35,45 @@ export default function GrandsObjectifsScreen() {
   const { width } = useWindowDimensions();
   const styles = getStyles(colorScheme, width);
 
+  // Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+
+  // Helper to show modal
+  const showModal = (title: string, message: string) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalVisible(true);
+  };
+
   const fetchObjectifs = async () => {
     if (!user) {
-      setLoading(false); // Arrêter le chargement si pas d'utilisateur
-      return; // Ne rien faire si l'utilisateur n'est pas connecté
+      setLoading(false); 
+      return; 
     }
     setLoading(true);
-    const { data, error } = await getGrandsObjectifs(user.id); // Passer l'ID utilisateur
+    const { data, error } = await getGrandsObjectifs(user.id); 
     if (data) {
       setObjectifs(data as GrandObjectif[]);
     } else if (error) {
       console.error("Erreur lors de la récupération des objectifs:", error);
+      showModal("Erreur", "Impossible de récupérer les objectifs."); // Show modal for fetch error
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    // Fetch seulement si l'utilisateur est chargé
     if (user) {
         fetchObjectifs();
     }
-  }, [user]); // Relancer si l'utilisateur change
+  }, [user]); 
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
     await fetchObjectifs();
     setRefreshing(false);
-  }, [user]); // Ajouter user aux dépendances
+  }, [user]); 
 
   const handleRevoir = (id: string) => {
     const messagePrefill = `objectif :${id}`;
@@ -71,7 +83,7 @@ export default function GrandsObjectifsScreen() {
   const handleUpdateStatus = async (id: string, newStatus: 'Terminé' | 'Abandonné' | 'En cours') => {
     const { data, error } = await updateGrandObjectifStatus(id, newStatus);
     if (error) {
-      Alert.alert('Erreur', `Impossible de mettre à jour le statut de l'objectif.`);
+      showModal('Erreur', `Impossible de mettre à jour le statut de l'objectif.`);
     } else if (data) {
       setObjectifs(prevObjectifs =>
         prevObjectifs.map(obj =>
@@ -158,6 +170,26 @@ export default function GrandsObjectifsScreen() {
 
   return (
     <View style={styles.container}>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(!modalVisible)}
+      >
+        <View style={styles.centeredView}>
+          <View style={styles.modalView}>
+            <Text style={styles.modalTitleText}>{modalTitle}</Text>
+            <Text style={styles.modalMessageText}>{modalMessage}</Text>
+            <Pressable
+              style={[styles.modalButton, styles.buttonConfirm]}
+              onPress={() => setModalVisible(!modalVisible)}
+            >
+              <Text style={styles.modalButtonText}>OK</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       {/* Conteneur pour le titre et l'image */}
       <View style={styles.titleContainer}>
         <Image source={require('@/assets/images/logo.png')} style={styles.logo} />
@@ -305,6 +337,63 @@ const getStyles = (scheme: 'light' | 'dark' | null | undefined, screenWidth: num
     statusEnCours: {
        color: colors.text,
        fontWeight: 'normal',
+    },
+    // Modal Styles (copied from profile.tsx)
+    centeredView: { 
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)', 
+    },
+    modalView: { 
+        margin: 20,
+        backgroundColor: colors.card,
+        borderRadius: 10,
+        padding: 25,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+        width: Platform.OS === 'web' ? '50%' : '85%', 
+        maxWidth: 400,
+        borderColor: colors.borderColor,
+        borderWidth: 1,
+    },
+    modalTitleText: {
+        marginBottom: 15,
+        textAlign: 'center',
+        fontSize: isWideScreen ? 19 : 18,
+        fontWeight: 'bold',
+        color: colors.textPrimary,
+    },
+    modalMessageText: {
+        marginBottom: 20,
+        textAlign: 'center',
+        fontSize: isWideScreen ? 17 : 16,
+        color: colors.text,
+        lineHeight: 22,
+    },
+    modalButton: { 
+        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        elevation: 2,
+        width: '100%', 
+        alignItems: 'center',
+    },
+    buttonConfirm: { 
+        backgroundColor: colors.tint, 
+    },
+    modalButtonText: { 
+        color: colors.buttonText, 
+        fontWeight: 'bold',
+        textAlign: 'center',
+        fontSize: isWideScreen ? 16 : 15,
     },
   });
 }; 

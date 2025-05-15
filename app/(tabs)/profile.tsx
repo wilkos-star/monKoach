@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, useWindowDimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, useWindowDimensions, Platform, Modal, Pressable } from 'react-native';
 import { useAuth } from '@/providers/AuthProvider';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -14,13 +14,25 @@ export default function ProfileScreen() {
   const styles = getStyles(colorScheme, width); // Pass width to styles
   const router = useRouter(); // Initialiser le router
 
+  // Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+
+  // Helper to show modal
+  const showModal = (title: string, message: string) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalVisible(true);
+  };
+
   const handleSignOut = async () => {
     setLoading(true);
     try {
       await signOutUser();
       // La redirection est gérée par le AuthProvider/_layout.tsx
     } catch (error: any) {
-      Alert.alert("Erreur de déconnexion", error?.message || "Une erreur est survenue.");
+      showModal("Erreur de déconnexion", error?.message || "Une erreur est survenue.");
     } finally {
       setLoading(false);
     }
@@ -33,6 +45,26 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(!modalVisible)}
+      >
+        <View style={styles.modalViewContainer}> {/* Renamed for clarity if styles differ */}
+          <View style={styles.modalContentView}> {/* Renamed for clarity */}
+            <Text style={styles.modalTitleText}>{modalTitle}</Text>
+            <Text style={styles.modalMessageText}>{modalMessage}</Text>
+            <Pressable
+              style={[styles.modalButton, styles.buttonConfirm]}
+              onPress={() => setModalVisible(!modalVisible)}
+            >
+              <Text style={styles.modalButtonText}>OK</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.contentWrapper}> {/* Added wrapper */} 
         <Text style={styles.title}>Mon Profil</Text>
         
@@ -187,6 +219,63 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => { // Added 
       color: colors.buttonText,
       fontSize: isWideScreen ? 17 : 16,
       fontWeight: 'bold',
+    },
+    // Styles pour le Modal (adaptés de certificats.tsx)
+    modalViewContainer: { // Renamed from centeredView for potential specific styling
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)', 
+    },
+    modalContentView: { // Renamed from modalView
+        margin: 20,
+        backgroundColor: colors.card,
+        borderRadius: 10,
+        padding: 25,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+        width: Platform.OS === 'web' ? '50%' : '85%', 
+        maxWidth: 400,
+        borderColor: colors.borderColor,
+        borderWidth: 1,
+    },
+    modalTitleText: {
+        marginBottom: 15,
+        textAlign: 'center',
+        fontSize: isWideScreen ? 19 : 18,
+        fontWeight: 'bold',
+        color: colors.textPrimary,
+    },
+    modalMessageText: {
+        marginBottom: 20,
+        textAlign: 'center',
+        fontSize: isWideScreen ? 17 : 16,
+        color: colors.text,
+        lineHeight: 22,
+    },
+    modalButton: { 
+        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        elevation: 2,
+        width: '100%', 
+        alignItems: 'center',
+    },
+    buttonConfirm: { 
+        backgroundColor: colors.tint, 
+    },
+    modalButtonText: { 
+        color: colors.buttonText, 
+        fontWeight: 'bold',
+        textAlign: 'center',
+        fontSize: isWideScreen ? 16 : 15,
     },
   });
 }; 

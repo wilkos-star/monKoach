@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, Image, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, Platform, useWindowDimensions
+  StyleSheet, ActivityIndicator, Alert, Platform, useWindowDimensions, Modal, Pressable
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '@/providers/AuthProvider';
 import { resetPassword, supabase } from '@/lib/supabase';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 // Ton logo
 const logo = require('@/assets/images/logo.png');
@@ -23,6 +25,19 @@ export default function AuthScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isWideScreen = width > 768;
+  const colorScheme = useColorScheme() ?? 'light';
+
+  // Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+
+  // Helper to show modal
+  const showModal = (title: string, message: string) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalVisible(true);
+  };
 
   const handleSubmit = async () => {
     const trimmedEmail = email.trim();
@@ -87,10 +102,10 @@ export default function AuthScreen() {
       Alert.prompt(
         'Mot de passe oublié',
         'Entrez votre adresse email pour recevoir les instructions de réinitialisation.',
-        async (email) => {
-          if (email && email.trim()) {
+        async (promptEmail) => {
+          if (promptEmail && promptEmail.trim()) {
             setResetLoading(true);
-            const { error } = await resetPassword(email.trim());
+            const { error } = await resetPassword(promptEmail.trim());
             setResetLoading(false);
             if (error) {
               Toast.show({ type: 'error', text1: 'Erreur', text2: error.message });
@@ -106,15 +121,15 @@ export default function AuthScreen() {
         'plain-text'
       );
     } else {
-      Alert.alert(
+      showModal(
         'Mot de passe oublié',
-        'Fonctionnalité de réinitialisation à venir. Pour l\'instant, veuillez contacter le support si besoin.',
-        [{ text: 'OK' }]
+        'Fonctionnalité de réinitialisation à venir. Pour l\'instant, veuillez contacter le support si besoin.'
       );
     }
   };
 
   const isLoading = loading || submitLoading || resetLoading;
+  const themedStyles = getThemedStyles(colorScheme, isWideScreen);
 
   const dynamicStyles = StyleSheet.create({
     container: {
@@ -190,6 +205,26 @@ export default function AuthScreen() {
 
   return (
     <View style={dynamicStyles.container}>
+        <Modal
+            animationType="fade"
+            transparent={true}
+            visible={modalVisible}
+            onRequestClose={() => setModalVisible(!modalVisible)}
+        >
+            <View style={themedStyles.centeredView}>
+                <View style={themedStyles.modalView}>
+                    <Text style={themedStyles.modalTitleText}>{modalTitle}</Text>
+                    <Text style={themedStyles.modalMessageText}>{modalMessage}</Text>
+                    <Pressable
+                        style={[themedStyles.modalButton, themedStyles.buttonConfirm]}
+                        onPress={() => setModalVisible(!modalVisible)}
+                    >
+                        <Text style={themedStyles.modalButtonText}>OK</Text>
+                    </Pressable>
+                </View>
+            </View>
+        </Modal>
+
       <View style={dynamicStyles.contentWrapper}>
           <Image source={logo} style={dynamicStyles.logo} />
 
@@ -282,3 +317,66 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
+// Fonction pour les styles du Modal et autres éléments thémés
+const getThemedStyles = (scheme: 'light' | 'dark', isWideScreen: boolean) => {
+    const colors = Colors[scheme];
+    return StyleSheet.create({
+        centeredView: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(0,0,0,0.4)', 
+        },
+        modalView: {
+            margin: 20,
+            backgroundColor: colors.card, 
+            borderRadius: 10,
+            padding: 25,
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: {
+                width: 0,
+                height: 2,
+            },
+            shadowOpacity: 0.25,
+            shadowRadius: 4,
+            elevation: 5,
+            width: Platform.OS === 'web' ? '50%' : '85%', 
+            maxWidth: 400,
+            borderColor: colors.borderColor,
+            borderWidth: 1,
+        },
+        modalTitleText: {
+            marginBottom: 15,
+            textAlign: 'center',
+            fontSize: isWideScreen ? 19 : 18,
+            fontWeight: 'bold',
+            color: colors.textPrimary,
+        },
+        modalMessageText: {
+            marginBottom: 20,
+            textAlign: 'center',
+            fontSize: isWideScreen ? 17 : 16,
+            color: colors.text,
+            lineHeight: 22,
+        },
+        modalButton: { 
+            borderRadius: 8,
+            paddingVertical: 12,
+            paddingHorizontal: 20,
+            elevation: 2,
+            width: '100%', 
+            alignItems: 'center',
+        },
+        buttonConfirm: { 
+            backgroundColor: colors.tint, 
+        },
+        modalButtonText: { 
+            color: colors.buttonText, 
+            fontWeight: 'bold',
+            textAlign: 'center',
+            fontSize: isWideScreen ? 16 : 15,
+        },
+    });
+};

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Alert, useWindowDimensions, Platform
+  View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, useWindowDimensions, Platform, Modal, Pressable
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { getUserCertificates } from '@/lib/supabase';
@@ -28,6 +28,18 @@ export default function CertificatesScreen() {
   const { width } = useWindowDimensions(); // Get window width
   const styles = getStyles(colorScheme, width); // Pass width to styles
 
+  // Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+
+  // Helper to show modal
+  const showModal = (title: string, message: string) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalVisible(true);
+  };
+
   useEffect(() => {
     const fetchCertificates = async () => {
       if (!user) {
@@ -38,7 +50,7 @@ export default function CertificatesScreen() {
       const { data, error } = await getUserCertificates(user.id);
       if (error) {
         console.error("Erreur chargement certificats:", error);
-        Alert.alert("Erreur", "Impossible de charger vos certificats.");
+        showModal("Erreur", "Impossible de charger vos certificats.");
       } else {
         setCertificates(data || []);
       }
@@ -50,14 +62,19 @@ export default function CertificatesScreen() {
 
   const handleViewCertificate = async (url: string | null) => {
     if (!url) {
-        Alert.alert("Lien manquant", "Aucune URL n'est associée à ce certificat.");
+        showModal("Lien manquant", "Aucune URL n'est associée à ce certificat.");
         return;
     }
-    const supported = await Linking.canOpenURL(url);
-    if (supported) {
-      await Linking.openURL(url);
-    } else {
-      Alert.alert("Erreur", `Impossible d'ouvrir ce lien: ${url}`);
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        showModal("Erreur", `Impossible d'ouvrir ce lien: ${url}`);
+      }
+    } catch (err) {
+        console.error("Erreur lors de l\'ouverture du lien:", err);
+        showModal("Erreur", `Une erreur s'est produite lors de la tentative d'ouverture du lien.`);
     }
   };
 
@@ -84,6 +101,26 @@ export default function CertificatesScreen() {
 
   return (
     <View style={styles.container}>
+        <Modal
+            animationType="fade"
+            transparent={true}
+            visible={modalVisible}
+            onRequestClose={() => setModalVisible(!modalVisible)}
+        >
+            <View style={styles.centeredView}>
+                <View style={styles.modalView}>
+                    <Text style={styles.modalTitleText}>{modalTitle}</Text>
+                    <Text style={styles.modalMessageText}>{modalMessage}</Text>
+                    <Pressable
+                        style={[styles.modalButton, styles.buttonConfirm]}
+                        onPress={() => setModalVisible(!modalVisible)}
+                    >
+                        <Text style={styles.modalButtonText}>OK</Text>
+                    </Pressable>
+                </View>
+            </View>
+        </Modal>
+
       <Stack.Screen options={{ title: 'Mes Certificats' }} />
       {loading ? (
         <View style={styles.centered}><ActivityIndicator size="large" color={Colors[colorScheme].tint} /></View>
@@ -158,6 +195,63 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
       marginTop: 50,
       fontSize: isWideScreen ? 18 : 16,
       color: colors.text,
+    },
+    // Modal Styles (similar to AdditionalInfoScreen)
+    centeredView: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)', 
+    },
+    modalView: {
+        margin: 20,
+        backgroundColor: colors.card, // Use theme color
+        borderRadius: 10,
+        padding: 25,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+        width: Platform.OS === 'web' ? '50%' : '85%', 
+        maxWidth: 400,
+        borderColor: colors.borderColor,
+        borderWidth: 1,
+    },
+    modalTitleText: {
+        marginBottom: 15,
+        textAlign: 'center',
+        fontSize: isWideScreen ? 19 : 18,
+        fontWeight: 'bold',
+        color: colors.textPrimary,
+    },
+    modalMessageText: {
+        marginBottom: 20,
+        textAlign: 'center',
+        fontSize: isWideScreen ? 17 : 16,
+        color: colors.text,
+        lineHeight: 22,
+    },
+    modalButton: { 
+        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        elevation: 2,
+        width: '100%', 
+        alignItems: 'center',
+    },
+    buttonConfirm: { 
+        backgroundColor: colors.tint, 
+    },
+    modalButtonText: { 
+        color: colors.buttonText, 
+        fontWeight: 'bold',
+        textAlign: 'center',
+        fontSize: isWideScreen ? 16 : 15,
     },
   });
 }; 

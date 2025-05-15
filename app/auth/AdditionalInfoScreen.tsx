@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert, Text, ActivityIndicator, useWindowDimensions, Platform } from 'react-native';
+import { View, TextInput, Button, StyleSheet, Text, ActivityIndicator, useWindowDimensions, Platform, Modal, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { updateUserProfile } from '../../lib/supabase';
 import { useAuth, WhatsAppUser } from '@/providers/AuthProvider';
@@ -15,30 +15,44 @@ const AdditionalInfoScreen = () => {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
 
+    // Modal State
+    const [modalVisible, setModalVisible] = useState(false);
+    const [modalTitle, setModalTitle] = useState('');
+    const [modalMessage, setModalMessage] = useState('');
+    const [modalOkAction, setModalOkAction] = useState(() => () => {}); // Callback for OK button
+
     const isWideScreen = width > 768;
+
+    // Helper to show modal
+    const showModal = (title: string, message: string, onOkPress?: () => void) => {
+        setModalTitle(title);
+        setModalMessage(message);
+        setModalOkAction(() => onOkPress ? () => { onOkPress(); setModalVisible(false); } : () => setModalVisible(false));
+        setModalVisible(true);
+    };
 
     useEffect(() => {
         if (!params.userId || !params.authToken || !params.phoneNumber) {
-            Alert.alert('Erreur', "Données utilisateur incomplètes. Impossible de continuer.");
-            router.replace('/auth/PhoneNumberScreen');
+            showModal('Erreur', "Données utilisateur incomplètes. Impossible de continuer.", () => router.replace('/auth/PhoneNumberScreen'));
+            // router.replace might be called before modal is seen, consider modal interaction first
         }
     }, [params, router]);
 
     const handleSubmit = async () => {
         if (!params.userId || !params.authToken || !params.phoneNumber) {
-            Alert.alert('Erreur', "Les informations de session sont manquantes.");
+            showModal('Erreur', "Les informations de session sont manquantes.");
             return;
         }
         if (!fullName.trim()) {
-            Alert.alert('Champ Requis', 'Veuillez entrer votre nom complet.');
+            showModal('Champ Requis', 'Veuillez entrer votre nom complet.');
             return;
         }
         if (!email.trim()) {
-            Alert.alert('Champ Requis', 'Veuillez entrer votre adresse e-mail.');
+            showModal('Champ Requis', 'Veuillez entrer votre adresse e-mail.');
             return;
         }
         if (!/\S+@\S+\.\S+/.test(email)) {
-            Alert.alert('Email Invalide', 'Veuillez entrer une adresse e-mail valide.');
+            showModal('Email Invalide', 'Veuillez entrer une adresse e-mail valide.');
             return;
         }
 
@@ -47,29 +61,52 @@ const AdditionalInfoScreen = () => {
             const { data: updatedUserData, error } = await updateUserProfile(params.userId, { nom: fullName, email });
 
             if (error || !updatedUserData) {
-                Alert.alert('Erreur de Mise à Jour', error?.message || 'Impossible de sauvegarder les informations.');
+                showModal('Erreur de Mise à Jour', error?.message || 'Impossible de sauvegarder les informations.');
             } else {
                 localStorage.setItem('userId', updatedUserData.id);
                 localStorage.setItem('userToken', updatedUserData.auth_token);
                 
                 auth.signInUser(updatedUserData as WhatsAppUser);
-                Alert.alert('Succès', 'Vos informations ont été enregistrées.', [
-                    { text: 'OK', onPress: () => router.replace('/(tabs)/chat') }
-                ]);
+                showModal('Succès', 'Vos informations ont été enregistrées.', () => router.replace('/(tabs)/chat'));
             }
         } catch (e: any) {
-            Alert.alert('Erreur Inattendue', e.message || 'Une erreur inconnue est survenue.');
+            showModal('Erreur Inattendue', e.message || 'Une erreur inconnue est survenue.');
         } finally {
             setLoading(false);
         }
     };
 
     if (!params.userId || !params.authToken || !params.phoneNumber) {
+        // This case should ideally be handled by the useEffect redirect or modal, 
+        // but kept as a fallback to prevent rendering the form.
         return <View style={styles.outerContainer}><ActivityIndicator size="large" color={Colors.light.tint} /></View>;
     }
 
     return (
         <View style={styles.outerContainer}>
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={() => {
+                    setModalVisible(!modalVisible);
+                    // Potentially call modalOkAction if it's just a dismiss action for some modals
+                }}
+            >
+                <View style={styles.centeredView}>
+                    <View style={styles.modalView}>
+                        <Text style={styles.modalTitleText}>{modalTitle}</Text>
+                        <Text style={styles.modalMessageText}>{modalMessage}</Text>
+                        <Pressable
+                            style={[styles.modalButton, styles.buttonConfirm]}
+                            onPress={modalOkAction} // Use the dynamic action
+                        >
+                            <Text style={styles.modalButtonText}>OK</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
+
             <View style={[styles.container, isWideScreen && styles.containerWide]}>
                 <Text style={[styles.title, isWideScreen && styles.titleWide]}>Complétez Votre Profil</Text>
                 <Text style={[styles.subtitle, isWideScreen && styles.subtitleWide]}>Veuillez fournir les informations suivantes pour continuer.</Text>
@@ -151,6 +188,61 @@ const styles = StyleSheet.create({
         fontSize: 16,
         backgroundColor: '#fff',
         color: '#333',
+    },
+    // Styles for Modal
+    centeredView: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)', 
+    },
+    modalView: {
+        margin: 20,
+        backgroundColor: 'white', 
+        borderRadius: 10,
+        padding: 25,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+        width: Platform.OS === 'web' ? '50%' : '85%', 
+        maxWidth: 400,
+    },
+    modalTitleText: {
+        marginBottom: 15,
+        textAlign: 'center',
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    modalMessageText: {
+        marginBottom: 20,
+        textAlign: 'center',
+        fontSize: 16,
+        color: '#555',
+        lineHeight: 22,
+    },
+    modalButton: { 
+        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        elevation: 2,
+        width: '100%', // Make button take full width of modal content area
+        alignItems: 'center',
+    },
+    buttonConfirm: { // Using buttonConfirm style for the single OK button
+        backgroundColor: Colors.light.tint, 
+    },
+    modalButtonText: { 
+        color: 'white', 
+        fontWeight: 'bold',
+        textAlign: 'center',
+        fontSize: 15,
     },
 });
 

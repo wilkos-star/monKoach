@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert, ActivityIndicator, Text, useWindowDimensions, Platform } from 'react-native';
+import { View, TextInput, Button, StyleSheet, Alert, ActivityIndicator, Text, useWindowDimensions, Platform, Modal, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { upsertUserByPhoneNumber } from '../../lib/supabase';
 import { Colors } from '../../constants/Colors'; 
@@ -11,6 +11,9 @@ const PhoneNumberScreen = () => {
     const router = useRouter();
     const auth = useAuth();
     const { width } = useWindowDimensions(); // Get window width
+
+    const [modalVisible, setModalVisible] = useState(false);
+    const [verificationParams, setVerificationParams] = useState<{ userId: string; phoneNumber: string | null | undefined } | null>(null);
 
     // Determine if the screen is wide (e.g., web desktop)
     const isWideScreen = width > 768; // Example breakpoint
@@ -55,23 +58,10 @@ const PhoneNumberScreen = () => {
                     setLoading(false);
                 }
             } else {
-                Alert.alert(
-                    'Confirmez votre numéro',
-                    `Est-ce que ${phoneNumber} est bien votre numéro WhatsApp ?`,
-                    [
-                        { text: 'Annuler', style: 'cancel', onPress: () => setLoading(false) },
-                        {
-                            text: 'Confirmer',
-                            onPress: () => {
-                                router.push({
-                                    pathname: '/auth/VerificationScreen',
-                                    params: { userId: userData.id, phoneNumber: userData.phone_number }
-                                });
-                            },
-                        },
-                    ],
-                    { cancelable: false }
-                );
+                // User is NOT verified, show custom modal
+                setVerificationParams({ userId: userData.id, phoneNumber: userData.phone_number });
+                setModalVisible(true);
+                // setLoading(false) is not called here; modal actions or navigation will handle it.
             }
 
         } catch (e: any) {
@@ -82,6 +72,51 @@ const PhoneNumberScreen = () => {
 
     return (
         <View style={styles.outerContainer}>
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={() => {
+                    setModalVisible(!modalVisible);
+                    setLoading(false); 
+                }}
+            >
+                <View style={styles.centeredView}>
+                    <View style={styles.modalView}>
+                        <Text style={styles.modalTitle}>Confirmez votre numéro</Text>
+                        <Text style={styles.modalText}>
+                            Est-ce que {phoneNumber} est bien votre numéro WhatsApp ?
+                        </Text>
+                        <View style={styles.modalButtonContainer}>
+                            <Pressable
+                                style={[styles.modalButton, styles.buttonCancel]}
+                                onPress={() => {
+                                    setModalVisible(!modalVisible);
+                                    setLoading(false);
+                                }}
+                            >
+                                <Text style={styles.modalButtonText}>Annuler</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[styles.modalButton, styles.buttonConfirm]}
+                                onPress={() => {
+                                    setModalVisible(!modalVisible);
+                                    if (verificationParams) {
+                                        router.push({
+                                            pathname: '/auth/VerificationScreen',
+                                            params: verificationParams
+                                        });
+                                    }
+                                    // setLoading(false); // Consider if needed, navigation might make it irrelevant
+                                }}
+                            >
+                                <Text style={styles.modalButtonText}>Confirmer</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
             <View style={[styles.container, isWideScreen && styles.containerWide]}>
                 <Text style={[styles.title, isWideScreen && styles.titleWide]}>Connexion / Inscription</Text>
                 <Text style={[styles.subtitle, isWideScreen && styles.subtitleWide]}>Entrez votre numéro WhatsApp pour commencer.</Text>
@@ -161,6 +196,71 @@ const styles = StyleSheet.create({
     inputWide: {
         // height: 55, // Optionally slightly larger input height on web
         // fontSize: 18, // Optionally slightly larger font in input on web
+    },
+    // Styles for Modal
+    centeredView: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)', 
+    },
+    modalView: {
+        margin: 20,
+        backgroundColor: 'white', 
+        borderRadius: 10,
+        padding: 25,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+        width: Platform.OS === 'web' ? '50%' : '85%', 
+        maxWidth: 400,
+    },
+    modalTitle: {
+        marginBottom: 15,
+        textAlign: 'center',
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    modalText: {
+        marginBottom: 20,
+        textAlign: 'center',
+        fontSize: 16,
+        color: '#555',
+        lineHeight: 22,
+    },
+    modalButtonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        width: '100%',
+        marginTop: 10,
+    },
+    modalButton: { 
+        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 10, // Adjusted for smaller screens
+        elevation: 2,
+        flex: 1, // Make buttons take available space
+        marginHorizontal: 5, // Add some space between buttons
+        alignItems: 'center',
+    },
+    buttonCancel: {
+        backgroundColor: '#A0A0A0', 
+    },
+    buttonConfirm: {
+        backgroundColor: Colors.light.tint, 
+    },
+    modalButtonText: { 
+        color: 'white', 
+        fontWeight: 'bold',
+        textAlign: 'center',
+        fontSize: 15,
     },
 });
 

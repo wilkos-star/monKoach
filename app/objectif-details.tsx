@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Platform, Alert, TouchableOpacity, useWindowDimensions } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, Platform, TouchableOpacity, useWindowDimensions, Modal, Pressable } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { getMiniObjectifs, updateMiniObjectifStatus } from '@/lib/supabase';
 import { Colors } from '@/constants/Colors';
@@ -33,6 +33,18 @@ export default function ObjectifDetailsScreen() {
   const { width } = useWindowDimensions();
   const styles = getStyles(colorScheme, width);
 
+  // Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+
+  // Helper to show modal
+  const showModal = (title: string, message: string) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalVisible(true);
+  };
+
   useEffect(() => {
     const fetchMiniObjectifs = async () => {
       if (!grandObjectifId) return;
@@ -42,7 +54,7 @@ export default function ObjectifDetailsScreen() {
         setMiniObjectifs(data as MiniObjectif[]);
       } else if (error) {
         console.error("Erreur lors de la récupération des mini objectifs:", error);
-        // Gérer l'erreur, par exemple afficher un message
+        showModal("Erreur", "Impossible de récupérer les mini objectifs.");
       }
       setLoading(false);
     };
@@ -54,7 +66,7 @@ export default function ObjectifDetailsScreen() {
   const handleUpdateMiniStatus = async (miniId: string, newStatus: 'Terminé' | 'En cours') => {
     const { data, error } = await updateMiniObjectifStatus(miniId, newStatus);
     if (error) {
-      Alert.alert('Erreur', `Impossible de mettre à jour le statut du mini objectif.`);
+      showModal('Erreur', `Impossible de mettre à jour le statut du mini objectif.`);
     } else if (data) {
       setMiniObjectifs(prevMiniObjectifs =>
         prevMiniObjectifs.map(mini =>
@@ -119,6 +131,26 @@ export default function ObjectifDetailsScreen() {
 
   return (
     <View style={styles.container}>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(!modalVisible)}
+      >
+        <View style={styles.centeredView}>
+          <View style={styles.modalView}>
+            <Text style={styles.modalTitleText}>{modalTitle}</Text>
+            <Text style={styles.modalMessageText}>{modalMessage}</Text>
+            <Pressable
+              style={[styles.modalButton, styles.buttonConfirm]}
+              onPress={() => setModalVisible(!modalVisible)}
+            >
+              <Text style={styles.modalButtonText}>OK</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       {/* Configurer l'en-tête de la Stack pour afficher le titre du grand objectif */}
       <Stack.Screen options={{ title: titre || 'Détails Objectif', headerBackTitle: 'Retour' }} />
 
@@ -236,6 +268,63 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
     statusEnCours: {
        color: colors.text,
        fontWeight: 'normal',
+    },
+    // Modal Styles (copiés et adaptés si besoin de certificates.tsx)
+    centeredView: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.4)', 
+    },
+    modalView: {
+        margin: 20,
+        backgroundColor: colors.card, 
+        borderRadius: 10,
+        padding: 25,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+        width: Platform.OS === 'web' ? '50%' : '85%', 
+        maxWidth: 400,
+        borderColor: colors.borderColor,
+        borderWidth: 1,
+    },
+    modalTitleText: {
+        marginBottom: 15,
+        textAlign: 'center',
+        fontSize: isWideScreen ? 19 : 18,
+        fontWeight: 'bold',
+        color: colors.textPrimary,
+    },
+    modalMessageText: {
+        marginBottom: 20,
+        textAlign: 'center',
+        fontSize: isWideScreen ? 17 : 16,
+        color: colors.text,
+        lineHeight: 22,
+    },
+    modalButton: { 
+        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        elevation: 2,
+        width: '100%', 
+        alignItems: 'center',
+    },
+    buttonConfirm: { 
+        backgroundColor: colors.tint, 
+    },
+    modalButtonText: { 
+        color: colors.buttonText, 
+        fontWeight: 'bold',
+        textAlign: 'center',
+        fontSize: isWideScreen ? 16 : 15,
     },
   });
 }; 
