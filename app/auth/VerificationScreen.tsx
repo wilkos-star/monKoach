@@ -5,7 +5,9 @@ import { checkUserVerification } from '../../lib/supabase'; // Adjust path as ne
 import { useAuth } from '@/providers/AuthProvider'; // Corrected path
 import { Colors } from '../../constants/Colors'; // Assuming you have this
 
-const VERIFICATION_URL_PREFIX = 'https://wa.me/22958082628?text=authentification';
+// Define the recipient phone number and the base URL prefix separately
+const WHATSAPP_RECIPIENT_NUMBER = '22958082628';
+const WHATSAPP_MESSAGE_KEYWORD = 'confirmer'; // To match the tipText
 const POLLING_INTERVAL = 5000; // 5 seconds
 
 const VerificationScreen = () => {
@@ -69,7 +71,13 @@ const VerificationScreen = () => {
             Alert.alert('Error', 'Phone number not available.');
             return;
         }
-        const url = `${VERIFICATION_URL_PREFIX}${phoneNumber}`;
+        // Construct the message text
+        const messageText = `${WHATSAPP_MESSAGE_KEYWORD} ${phoneNumber}`;
+        // URL-encode the message text
+        const encodedMessageText = encodeURIComponent(messageText);
+        // Construct the final URL
+        const url = `https://wa.me/${WHATSAPP_RECIPIENT_NUMBER}?text=${encodedMessageText}`;
+        
         try {
             const supported = await Linking.canOpenURL(url);
             if (supported) {
