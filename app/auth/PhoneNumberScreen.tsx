@@ -63,6 +63,7 @@ const PhoneNumberScreen = () => {
                         {
                             text: 'Confirmer',
                             onPress: () => {
+                                setLoading(false);
                                 router.push({
                                     pathname: '/auth/VerificationScreen',
                                     params: { userId: userData.id, phoneNumber: userData.phone_number }
