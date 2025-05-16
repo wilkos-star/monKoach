@@ -76,12 +76,6 @@ const AdditionalInfoScreen = () => {
         }
     };
 
-    if (!params.userId || !params.authToken || !params.phoneNumber) {
-        // This case should ideally be handled by the useEffect redirect or modal, 
-        // but kept as a fallback to prevent rendering the form.
-        return <View style={styles.outerContainer}><ActivityIndicator size="large" color={Colors.light.tint} /></View>;
-    }
-
     return (
         <View style={styles.outerContainer}>
             <Modal
