@@ -5,6 +5,7 @@ import { getMiniObjectifs, updateMiniObjectifStatus } from '@/lib/supabase';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { MoreVertical } from 'lucide-react-native';
+import ReactMarkdown from 'react-native-markdown-display';
 import { 
   Menu, 
   MenuOptions, 
@@ -32,6 +33,7 @@ export default function ObjectifDetailsScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const { width } = useWindowDimensions();
   const styles = getStyles(colorScheme, width);
+  const markdownStyles = getMarkdownStyles(Colors[colorScheme], width);
 
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
@@ -104,7 +106,13 @@ export default function ObjectifDetailsScreen() {
       <View style={styles.itemContainer}>
         <View style={styles.itemContent}>
           <Text style={styles.itemTitle}>{item.mini_objectif || 'Mini objectif sans titre'}</Text>
-          {item.details_miniobjectifs && <Text style={styles.itemDetail}>Détails: {item.details_miniobjectifs}</Text>}
+          {item.details_miniobjectifs && (
+            <View style={styles.detailsMarkdownContainer}>
+              <ReactMarkdown style={markdownStyles}>
+                {item.details_miniobjectifs}
+              </ReactMarkdown>
+            </View>
+          )}
           {item.statut && <Text style={[styles.itemDetail, getStatusStyle(item.statut)]}>Statut: {item.statut}</Text>}
           {item.deadline && (
             <Text style={styles.itemDetail}>
@@ -170,6 +178,25 @@ export default function ObjectifDetailsScreen() {
   );
 }
 
+// Markdown Styles (similar to chat.tsx, can be adjusted)
+const getMarkdownStyles = (colors: typeof Colors.light | typeof Colors.dark, screenWidth: number) => {
+  const isWideScreen = screenWidth > 768;
+  return StyleSheet.create({
+    body: { color: colors.text, fontSize: isWideScreen ? 15 : 14, lineHeight: isWideScreen ? 22 : 20 },
+    heading1: { color: colors.textPrimary, fontSize: isWideScreen ? 20 : 18, fontWeight: 'bold', marginTop: 10, marginBottom: 5 },
+    heading2: { color: colors.textPrimary, fontSize: isWideScreen ? 18 : 16, fontWeight: 'bold', marginTop: 8, marginBottom: 4 },
+    heading3: { color: colors.text, fontSize: isWideScreen ? 16 : 15, fontWeight: 'bold', marginTop: 6, marginBottom: 3 },
+    paragraph: { marginBottom: 8, marginTop: 0 }, // Adjusted for better spacing within cards
+    list_item: { marginBottom: 4, flexDirection: 'row', alignItems: 'flex-start' },
+    bullet_list_icon: { color: colors.tint, marginRight: 8, marginTop: isWideScreen ? 6 : 5, fontSize: isWideScreen ? 8 : 7 },
+    ordered_list_icon: { color: colors.tint, marginRight: 8, marginTop: isWideScreen ? 2 : 1, fontWeight: 'bold' }, 
+    strong: { fontWeight: 'bold' }, // Uses parent color by default, can be colors.tint if desired
+    em: { fontStyle: 'italic' }, // Uses parent color by default
+    link: { color: colors.tint, textDecorationLine: 'underline' },
+    // Add other styles as needed: blockquote, hr, code_inline, code_block, fence, table, etc.
+  });
+};
+
 // Styles
 const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
   const colors = Colors[scheme];
@@ -221,6 +248,10 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
       fontWeight: '600',
       color: colors.text,
       marginBottom: isWideScreen ? 10 : 8,
+    },
+    detailsMarkdownContainer: {
+      marginTop: isWideScreen ? 4 : 2,
+      marginBottom: isWideScreen ? 6 : 4,
     },
     itemDetail: {
       fontSize: isWideScreen ? 15 : 14,
