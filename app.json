@@ -31,7 +31,8 @@
       "lang": "fr-FR",
       "display": "standalone",
       "themeColor": "#DFF6ED",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#FFFFFF",
+      "template": "./web/index.html"
     },
     "plugins": [
       "expo-router",
