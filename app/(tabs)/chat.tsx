@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send } from 'lucide-react-native'; // Keep Send, remove Loader2 if unused or handle loading differently
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Linking, ViewStyle, TextStyle, useWindowDimensions, Modal, Pressable } from 'react-native'; // Import React Native components & Linking & Alert & Modal & Pressable
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Linking, ViewStyle, TextStyle, useWindowDimensions, Modal, Pressable, Image } from 'react-native'; // Import React Native components & Linking & Alert & Modal & Pressable & Image
 import { SafeAreaView } from 'react-native-safe-area-context'; // Importer SafeAreaView
 import ReactMarkdown from 'react-native-markdown-display'; // Use react-native-markdown-display
 import { supabase } from '@/lib/supabase'; // Adjust this path if your supabase client is elsewhere
@@ -86,21 +86,11 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
       alignItems: 'center',
       marginBottom: isWideScreen ? 10 : 8,
     },
-    koachAvatarContainer: {
+    koachAvatarImage: { 
       width: isWideScreen ? 32 : 28,
       height: isWideScreen ? 32 : 28,
-      borderRadius: isWideScreen ? 16 : 14,
-      // Couleur claire basée sur le tint/primary ? À définir si besoin
-      backgroundColor: scheme === 'light' ? '#EAE0D5' : '#333', 
-      alignItems: 'center',
-      justifyContent: 'center',
+      borderRadius: isWideScreen ? 16 : 14, 
       marginRight: isWideScreen ? 10 : 8,
-    },
-    koachAvatarInner: {
-      width: isWideScreen ? 22 : 20,
-      height: isWideScreen ? 22 : 20,
-      borderRadius: isWideScreen ? 11 : 10,
-      backgroundColor: colors.tint, // Couleur principale
     },
     koachName: {
       fontWeight: '500',
@@ -124,8 +114,8 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
       textAlign: 'right',
     },
     timestampUser: {
-      // Couleur légèrement transparente basée sur buttonText
-      color: scheme === 'light' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(236, 237, 238, 0.7)', 
+      // Couleur légèrement transparente basée sur buttonText ou koachText
+      color: scheme === 'dark' ? 'rgba(51, 51, 51, 0.7)' : 'rgba(255, 255, 255, 0.7)', 
     },
     timestampKoach: {
       color: scheme === 'light' ? 'rgba(51, 51, 51, 0.5)' : 'rgba(236, 237, 238, 0.5)', // Basé sur text
@@ -415,9 +405,10 @@ const ChatInterface: React.FC = () => {
             >
               {message.sender === 'koach' && (
                 <View style={styles.koachHeader}>
-                  <View style={styles.koachAvatarContainer}>
-                    <View style={styles.koachAvatarInner} />
-                  </View>
+                  <Image 
+                    source={require('@/assets/images/logo.png')} 
+                    style={styles.koachAvatarImage} 
+                  />
                   <Text style={styles.koachName}>Mon Koach</Text>
                 </View>
               )}
@@ -441,9 +432,10 @@ const ChatInterface: React.FC = () => {
           {isLoading && (
             <View style={[styles.loadingContainer, styles.koachMessage]}>
                <View style={styles.koachHeader}>
-                  <View style={styles.koachAvatarContainer}>
-                    <View style={styles.koachAvatarInner} />
-                  </View>
+                  <Image 
+                    source={require('@/assets/images/logo.png')} 
+                    style={styles.koachAvatarImage} 
+                  />
                   <Text style={styles.koachName}>Mon Koach</Text>
                 </View>
               <View style={styles.loadingContent}>
