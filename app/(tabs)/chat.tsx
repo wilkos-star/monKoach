@@ -109,7 +109,7 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
     },
     messageContentUser: {
       fontSize: isWideScreen ? 15 : 14,
-      color: scheme === 'dark' ? Colors.dark.text : Colors.light.buttonText,
+      color: scheme === 'dark' ? Colors.light.text : Colors.light.buttonText,
       lineHeight: isWideScreen ? 22 : 20,
     },
     messageContentKoach: {
