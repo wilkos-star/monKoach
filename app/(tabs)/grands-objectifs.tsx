@@ -195,6 +195,16 @@ export default function GrandsObjectifsScreen() {
         <Image source={require('@/assets/images/logo.png')} style={styles.logo} />
         <Text style={styles.title}>Mes Objectifs</Text>
       </View>
+
+      {/* Bouton pour définir un nouvel objectif */}
+      <TouchableOpacity 
+        style={styles.defineObjectiveButton}
+        onPress={() => router.push({ pathname: '/chat', params: { prefill: "Je veux définir un nouvel objectif avec Mon Koach" } })}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.defineObjectiveButtonText}>Définir un objectif avec Mon Koach</Text>
+      </TouchableOpacity>
+
       <FlatList
         data={objectifs}
         renderItem={renderItem}
@@ -394,6 +404,28 @@ const getStyles = (scheme: 'light' | 'dark' | null | undefined, screenWidth: num
         fontWeight: 'bold',
         textAlign: 'center',
         fontSize: isWideScreen ? 16 : 15,
+    },
+    defineObjectiveButton: {
+      backgroundColor: colors.tint,
+      paddingVertical: isWideScreen ? 14 : 12,
+      paddingHorizontal: isWideScreen ? 24 : 20,
+      borderRadius: isWideScreen ? 10 : 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: isWideScreen ? 25 : 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+      elevation: 3,
+      alignSelf: 'center', 
+      width: Platform.OS === 'web' ? 'auto' : '100%',
+      maxWidth: Platform.OS === 'web' ? 400 : undefined,
+    },
+    defineObjectiveButtonText: {
+      color: colors.buttonText,
+      fontSize: isWideScreen ? 17 : 16,
+      fontWeight: '600',
     },
   });
 }; 
