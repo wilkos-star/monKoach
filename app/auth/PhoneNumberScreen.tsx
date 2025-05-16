@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert, ActivityIndicator, Text, useWindowDimensions, Platform, Modal, Pressable } from 'react-native';
+import { View, TextInput, Button, StyleSheet, ActivityIndicator, Text, useWindowDimensions, Platform, Modal, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { upsertUserByPhoneNumber } from '../../lib/supabase';
 import { Colors } from '../../constants/Colors'; 
@@ -10,21 +10,29 @@ const PhoneNumberScreen = () => {
     const [loading, setLoading] = useState(false);
     const router = useRouter();
     const auth = useAuth();
-    const { width } = useWindowDimensions(); // Get window width
+    const { width } = useWindowDimensions();
 
-    const [modalVisible, setModalVisible] = useState(false);
+    const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
+    const [errorModalVisible, setErrorModalVisible] = useState(false);
+    const [modalTitle, setModalTitle] = useState('');
+    const [modalMessage, setModalMessage] = useState('');
     const [verificationParams, setVerificationParams] = useState<{ userId: string; phoneNumber: string | null | undefined } | null>(null);
 
-    // Determine if the screen is wide (e.g., web desktop)
-    const isWideScreen = width > 768; // Example breakpoint
+    const isWideScreen = width > 768;
+
+    const showErrorModal = (title: string, message: string) => {
+        setModalTitle(title);
+        setModalMessage(message);
+        setErrorModalVisible(true);
+    };
 
     const handleContinue = async () => {
         if (!phoneNumber.trim()) {
-            Alert.alert('Erreur', 'Veuillez entrer votre numéro de téléphone WhatsApp.');
+            showErrorModal('Erreur', 'Veuillez entrer votre numéro de téléphone WhatsApp.');
             return;
         }
-        if (!/^\+?[1-9]\d{7,14}$/.test(phoneNumber)) {
-             Alert.alert('Numéro Invalide', 'Veuillez entrer un numéro de téléphone valide (ex: +33612345678).');
+        if (!/^\+[1-9]\d{9,14}$/.test(phoneNumber)) {
+             showErrorModal('Numéro Invalide', 'Veuillez entrer un numéro de téléphone valide commençant par + et suivi d\'au moins 10 chiffres (ex: +336123456789).');
              return;
         }
 
@@ -33,18 +41,17 @@ const PhoneNumberScreen = () => {
             const { data: userData, error } = await upsertUserByPhoneNumber(phoneNumber);
 
             if (error || !userData) {
-                Alert.alert('Erreur', error?.message || 'Une erreur est survenue lors de la récupération des données utilisateur.');
+                showErrorModal('Erreur', error?.message || 'Une erreur est survenue lors de la récupération des données utilisateur.');
                 setLoading(false);
                 return;
             }
 
             if (userData.is_verified) {
-                if (userData.email) {
+                if (userData.email && userData.nom) {
                     localStorage.setItem('userId', userData.id);
                     localStorage.setItem('userToken', userData.auth_token);
                     auth.signInUser(userData as WhatsAppUser);
                     router.replace('/(tabs)/chat');
-                    setLoading(false);
                 } else {
                     router.push({
                         pathname: '/auth/AdditionalInfoScreen',
@@ -55,18 +62,17 @@ const PhoneNumberScreen = () => {
                             currentNom: userData.nom || '' 
                         }
                     });
-                    setLoading(false);
                 }
             } else {
-                // User is NOT verified, show custom modal
                 setVerificationParams({ userId: userData.id, phoneNumber: userData.phone_number });
-                setModalVisible(true);
-                // setLoading(false) is not called here; modal actions or navigation will handle it.
+                setModalTitle('Confirmez votre numéro');
+                setModalMessage(`Est-ce que ${phoneNumber} est bien votre numéro WhatsApp ?`);
+                setConfirmationModalVisible(true);
             }
 
         } catch (e: any) {
-            Alert.alert('Erreur Inattendue', e.message || 'Une erreur inconnue est survenue.');
-            setLoading(false);
+            showErrorModal('Erreur Inattendue', e.message || 'Une erreur inconnue est survenue.');
+        } finally {
         }
     };
 
@@ -75,23 +81,21 @@ const PhoneNumberScreen = () => {
             <Modal
                 animationType="fade"
                 transparent={true}
-                visible={modalVisible}
+                visible={confirmationModalVisible}
                 onRequestClose={() => {
-                    setModalVisible(!modalVisible);
+                    setConfirmationModalVisible(false);
                     setLoading(false); 
                 }}
             >
                 <View style={styles.centeredView}>
                     <View style={styles.modalView}>
-                        <Text style={styles.modalTitle}>Confirmez votre numéro</Text>
-                        <Text style={styles.modalText}>
-                            Est-ce que {phoneNumber} est bien votre numéro WhatsApp ?
-                        </Text>
+                        <Text style={styles.modalTitle}>{modalTitle}</Text>
+                        <Text style={styles.modalText}>{modalMessage}</Text>
                         <View style={styles.modalButtonContainer}>
                             <Pressable
                                 style={[styles.modalButton, styles.buttonCancel]}
                                 onPress={() => {
-                                    setModalVisible(!modalVisible);
+                                    setConfirmationModalVisible(false);
                                     setLoading(false);
                                 }}
                             >
@@ -100,19 +104,38 @@ const PhoneNumberScreen = () => {
                             <Pressable
                                 style={[styles.modalButton, styles.buttonConfirm]}
                                 onPress={() => {
-                                    setModalVisible(!modalVisible);
+                                    setConfirmationModalVisible(false);
                                     if (verificationParams) {
                                         router.push({
                                             pathname: '/auth/VerificationScreen',
                                             params: verificationParams
                                         });
                                     }
-                                    // setLoading(false); // Consider if needed, navigation might make it irrelevant
                                 }}
                             >
                                 <Text style={styles.modalButtonText}>Confirmer</Text>
                             </Pressable>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={errorModalVisible}
+                onRequestClose={() => setErrorModalVisible(false)}
+            >
+                <View style={styles.centeredView}>
+                    <View style={styles.modalView}>
+                        <Text style={styles.modalTitle}>{modalTitle}</Text>
+                        <Text style={styles.modalText}>{modalMessage}</Text>
+                        <Pressable
+                            style={[styles.modalButton, styles.buttonConfirm, { width: '100%' }]}
+                            onPress={() => setErrorModalVisible(false)}
+                        >
+                            <Text style={styles.modalButtonText}>OK</Text>
+                        </Pressable>
                     </View>
                 </View>
             </Modal>
@@ -145,41 +168,39 @@ const styles = StyleSheet.create({
     outerContainer: {
         flex: 1,
         justifyContent: 'center',
-        alignItems: 'center', // Center the inner container on web
+        alignItems: 'center',
         backgroundColor: '#f0f0f0',
-        padding: 20, // Base padding for smaller screens
+        padding: 20,
     },
     container: {
-        width: '100%', // Full width on mobile
-        maxWidth: 400, // Max width for the content block on larger screens
-        padding: Platform.select({ web: 0, default: 0}), // Original padding moved to outerContainer or adjusted
-        // justifyContent: 'center', // Already in outerContainer
-        // backgroundColor: '#f0f0f0', // Moved to outerContainer
+        width: '100%',
+        maxWidth: 400,
+        padding: Platform.select({ web: 0, default: 0}),
     },
-    containerWide: { // Additional styles for wider screens
-        padding: 40, // Larger padding for web
-        backgroundColor: '#ffffff', // Optional: different background for the content card on web
+    containerWide: {
+        padding: 40,
+        backgroundColor: '#ffffff',
         borderRadius: Platform.select({web: 12, default: 0}),
         boxShadow: Platform.select({web: '0 4px 8px rgba(0,0,0,0.1)', default: undefined }) as any,
     },
     title: {
-        fontSize: 22, // Adjusted base font size
+        fontSize: 22,
         fontWeight: 'bold',
         marginBottom: 10,
         textAlign: 'center',
         color: '#333',
     },
     titleWide: {
-        fontSize: 32, // Larger font size for web
+        fontSize: 32,
     },
     subtitle: {
-        fontSize: 14, // Adjusted base font size
+        fontSize: 14,
         marginBottom: 25,
         textAlign: 'center',
         color: '#555',
     },
     subtitleWide: {
-        fontSize: 18, // Larger font size for web
+        fontSize: 18,
     },
     input: {
         height: 50,
@@ -191,13 +212,9 @@ const styles = StyleSheet.create({
         fontSize: 16,
         backgroundColor: '#fff',
         color: '#333',
-        // On web, let it take the width of its container (which has maxWidth)
     },
     inputWide: {
-        // height: 55, // Optionally slightly larger input height on web
-        // fontSize: 18, // Optionally slightly larger font in input on web
     },
-    // Styles for Modal
     centeredView: {
         flex: 1,
         justifyContent: 'center',
@@ -244,10 +261,10 @@ const styles = StyleSheet.create({
     modalButton: { 
         borderRadius: 8,
         paddingVertical: 12,
-        paddingHorizontal: 10, // Adjusted for smaller screens
+        paddingHorizontal: 10,
         elevation: 2,
-        flex: 1, // Make buttons take available space
-        marginHorizontal: 5, // Add some space between buttons
+        flex: 1,
+        marginHorizontal: 5,
         alignItems: 'center',
     },
     buttonCancel: {
