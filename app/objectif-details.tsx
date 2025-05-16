@@ -170,7 +170,7 @@ export default function ObjectifDetailsScreen() {
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
-          ListHeaderComponent={<Text style={styles.headerTitle}>Mini Objectifs pour "{titre}"</Text>}
+          ListHeaderComponent={<Text style={styles.headerTitle}>{titre}</Text>}
           ListEmptyComponent={<Text style={styles.emptyText}>Aucun mini objectif trouvé pour cet objectif.</Text>}
         />
       )}
