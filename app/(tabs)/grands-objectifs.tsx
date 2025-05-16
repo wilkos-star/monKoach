@@ -199,7 +199,7 @@ export default function GrandsObjectifsScreen() {
       {/* Bouton pour définir un nouvel objectif */}
       <TouchableOpacity 
         style={styles.defineObjectiveButton}
-        onPress={() => router.push({ pathname: '/chat', params: { prefill: "Je veux définir un nouvel objectif avec Mon Koach" } })}
+        onPress={() => router.push({ pathname: '/chat' })}
         activeOpacity={0.7}
       >
         <Text style={styles.defineObjectiveButtonText}>Définir un objectif avec Mon Koach</Text>
