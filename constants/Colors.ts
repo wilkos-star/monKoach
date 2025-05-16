@@ -36,7 +36,7 @@ export const Colors = {
     tint: white,
     icon: koachMuted, // Utiliser le gris clair pour icônes sombres
     card: black, // Fond des cartes en mode sombre
-    buttonText: darkText,
+    buttonText: koachText,
     tabIconDefault: koachMuted,
     tabIconSelected: white,
     borderColor: '#333', // Bordure sombre

@@ -66,8 +66,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                                     console.log('(AuthProvider) User verified successfully from storage (profile complete):', userData);
                                     setUser(userData as WhatsAppUser);
                                 } else {
-                                    console.log('(AuthProvider) User verified from storage BUT profile incomplete. Clearing credentials to force re-flow.', userData);
-                                    clearStoredCredentials(); 
+                                    console.log('(AuthProvider) User verified from storage BUT profile incomplete. Setting user, redirection to AdditionalInfoScreen should occur.', userData);
+                                    setUser(userData as WhatsAppUser);
                                 }
                             } else {
                                 console.log('(AuthProvider) Stored user not verified or token mismatch, clearing credentials.');
