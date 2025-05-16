@@ -1,5 +1,5 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs, useRouter, useSegments, usePathname } from 'expo-router';
+import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { Target, User, BookOpen } from 'lucide-react-native';
 
@@ -9,9 +9,26 @@ import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import CustomInstallPrompt from '../../components/CustomInstallPrompt';
+import { useAuth } from '@/providers/AuthProvider';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? 'light';
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+
+    if (user && (!user.email || !user.nom) && pathname !== '/auth/AdditionalInfoScreen') {
+      console.log('(tabs)/_layout: User profile incomplete, redirecting to AdditionalInfoScreen from:', pathname, user);
+      router.replace('/auth/AdditionalInfoScreen');
+    } else if (!user && pathname !== '/auth/PhoneNumberScreen' && pathname !== '/auth/VerificationScreen' && pathname !== '/auth/AdditionalInfoScreen' && pathname !== '/auth/auth') {
+      console.log('(tabs)/_layout: No user, not on auth screen. Root layout should handle redirection to login.', pathname);
+    }
+  }, [user, loading, router, pathname]);
 
   return (
     <>
@@ -23,7 +40,6 @@ export default function TabLayout() {
           tabBarBackground: TabBarBackground,
           tabBarStyle: Platform.select({
             ios: {
-              // Use a transparent background on iOS to show the blur effect
               position: 'absolute',
             },
             default: {},

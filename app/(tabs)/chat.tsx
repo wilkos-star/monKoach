@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'; // Adjust this path if your supabase 
 import { useLocalSearchParams, useRouter } from 'expo-router'; // Importer useLocalSearchParams et useRouter
 import { useColorScheme } from '@/hooks/useColorScheme'; // Importer pour le thème
 import { Colors } from '@/constants/Colors'; // Importer Colors
+import { useAuth } from '@/providers/AuthProvider'; // Corrected import path
 
 interface Message {
   id: string;
@@ -266,6 +267,9 @@ const ChatInterface: React.FC = () => {
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState('');
 
+  // Get user from AuthContext
+  const { user: authContextUser } = useAuth(); // <<< MODIFICATION: Get user from context
+
   // Helper to show modal
   const showModal = (title: string, message: string) => {
     setModalTitle(title);
@@ -310,20 +314,18 @@ const ChatInterface: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Get user data from Supabase
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        console.error('Error fetching user:', userError);
-        showModal("Erreur", "Impossible de récupérer les informations utilisateur.");
-        // Optional: add back the user message input or handle differently
-        setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
+      // MODIFICATION: Use user from AuthContext directly
+      if (!authContextUser || !authContextUser.id || !authContextUser.email) { 
+        console.error('ChatInterface: User data missing or incomplete from AuthContext.', authContextUser);
+        showModal("Erreur d'Authentification", "Vos informations utilisateur sont incomplètes ou manquantes. Veuillez vous reconnecter.");
+        setMessages(prev => prev.filter(msg => msg.id !== userMessage.id)); // Remove optimistic user message
         setIsLoading(false);
-        return; // Stop execution if user data fails
+        return; 
       }
 
-      const userId = user.id;
-      const userEmail = user.email;
+      const userId = authContextUser.id;
+      const userEmail = authContextUser.email;
+      // Fin de la MODIFICATION
 
       const response = await fetch('https://n8n-nw6a.onrender.com/webhook/moncoach', {
         method: 'POST',
@@ -331,20 +333,27 @@ const ChatInterface: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: currentInput, // Use the stored value
-          userId: userId, // Use the actual user ID
-          email: userEmail, // Include the user email
+          message: currentInput, 
+          userId: userId, 
+          email: userEmail, 
           timestamp: new Date().toISOString()
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Erreur de communication avec le serveur');
+        // Try to get more details from the response if possible
+        let errorDetails = 'Erreur de communication avec le serveur';
+        try {
+            const errorData = await response.json();
+            errorDetails = errorData.message || errorData.error || errorDetails;
+        } catch (e) {
+            // Ignore if response is not JSON
+        }
+        throw new Error(errorDetails);
       }
 
       const data = await response.json();
 
-      // No artificial delay needed unless desired
       const koachResponse: Message = {
         id: Date.now().toString(),
         content: data.response || "Je suis là pour t'aider à atteindre tes objectifs. Dis-moi ce qui t'intéresse !",
@@ -354,17 +363,12 @@ const ChatInterface: React.FC = () => {
 
       setMessages(prev => [...prev, koachResponse]);
 
-    } catch (error) {
+    } catch (error: any) { // Catch any error type
       console.error('Error sending message:', error);
-      // Handle error (e.g., show an alert or a specific error message component)
-      showModal("Problème de connexion", "Je rencontre des difficultés à me connecter. Réessaie plus tard !"); // Use Alert
-
-      // Optional: Add back the failed user message or indicate failure
-      // setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
-
-
+      showModal("Problème de Connexion", error.message || "Je rencontre des difficultés à me connecter. Réessaie plus tard !"); 
+      // No need to remove user message here, as it's a server/network error, not an auth error before sending
     } finally {
-        setIsLoading(false); // Ensure loading state is reset
+        setIsLoading(false); 
     }
   };
 
