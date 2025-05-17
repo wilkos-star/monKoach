@@ -67,7 +67,7 @@ const AdditionalInfoScreen = () => {
                 localStorage.setItem('userToken', updatedUserData.auth_token);
                 
                 auth.signInUser(updatedUserData as WhatsAppUser);
-                showModal('Succès', 'Vos informations ont été enregistrées.', () => router.replace('/(tabs)/chat'));
+                showModal('Succès', 'Vos informations ont été enregistrées.', () => router.replace({ pathname: '/(tabs)/chat', params: { fromProfileCompletion: 'true' } }));
             }
         } catch (e: any) {
             showModal('Erreur Inattendue', e.message || 'Une erreur inconnue est survenue.');

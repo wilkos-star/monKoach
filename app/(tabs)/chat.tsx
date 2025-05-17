@@ -4,7 +4,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Activi
 import { SafeAreaView } from 'react-native-safe-area-context'; // Importer SafeAreaView
 import ReactMarkdown from 'react-native-markdown-display'; // Use react-native-markdown-display
 import { supabase } from '@/lib/supabase'; // Adjust this path if your supabase client is elsewhere
-import { useLocalSearchParams, useRouter } from 'expo-router'; // Importer useLocalSearchParams et useRouter
+import { useLocalSearchParams, useRouter, usePathname } from 'expo-router'; // Importer useLocalSearchParams et useRouter
 import { useColorScheme } from '@/hooks/useColorScheme'; // Importer pour le thème
 import { Colors } from '@/constants/Colors'; // Importer Colors
 import { useAuth } from '@/providers/AuthProvider'; // Corrected import path
@@ -235,37 +235,48 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
 
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: "Bonjour ! Je suis ton Koach personnel. Comment puis-je t'aider aujourd'hui ?",
-      sender: 'koach',
-      timestamp: new Date()
-    }
+    // Initial welcome message will be conditional
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
-  const { prefill } = useLocalSearchParams<{ prefill?: string }>(); // Récupérer le paramètre
+  const params = useLocalSearchParams<{ prefill?: string, fromProfileCompletion?: string }>(); // Récupérer les paramètres
   const router = useRouter(); // Pour potentiellement effacer le paramètre
+  const pathname = usePathname(); // To get current path for replace
   const colorScheme = useColorScheme() ?? 'light';
-  const { width } = useWindowDimensions(); // Get screen width
-  const styles = getStyles(colorScheme, width); // Pass width to styles
-  const markdownStyles = getMarkdownStyles(Colors[colorScheme], width); // Pass width to markdown styles
+  const { width } = useWindowDimensions(); // Pour obtenir la largeur de l'écran
+  const styles = getStyles(colorScheme, width); // Obtenir les styles dynamiques
+  const markdownStyles = getMarkdownStyles(Colors[colorScheme], width); // Obtenir les styles markdown dynamiques
+  const { user } = useAuth(); // Get user info
 
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState('');
 
-  // Get user from AuthContext
-  const { user: authContextUser } = useAuth(); // <<< MODIFICATION: Get user from context
+  useEffect(() => {
+    const initialMessages: Message[] = [];
+    if (params.fromProfileCompletion === 'true') {
+        initialMessages.push({
+            id: 'welcome-profile-complete',
+            content: `Félicitations ${user?.nom || ''} ! Votre profil est complet. Vous pouvez maintenant explorer toutes les fonctionnalités. Que souhaitez-vous faire en premier ? Vous pouvez par exemple définir un grand objectif ou explorer les cours disponibles.`,
+            sender: 'koach',
+            timestamp: new Date(),
+        });
+        // Clear the fromProfileCompletion param while preserving others like prefill
+        const { fromProfileCompletion, ...restParams } = params;
+        router.replace({ pathname: pathname as any, params: restParams });
 
-  // Helper to show modal
-  const showModal = (title: string, message: string) => {
-    setModalTitle(title);
-    setModalMessage(message);
-    setModalVisible(true);
-  };
+    } else {
+        initialMessages.push({
+            id: '1',
+            content: "Bonjour ! Je suis ton Koach personnel. Comment puis-je t'aider aujourd'hui ?",
+            sender: 'koach',
+            timestamp: new Date()
+        });
+    }
+    setMessages(initialMessages);
+  }, [params.fromProfileCompletion, user?.nom, router, pathname]);
 
   const scrollToBottom = () => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -277,8 +288,8 @@ const ChatInterface: React.FC = () => {
 
   // Effet pour gérer le pré-remplissage
   useEffect(() => {
-    if (prefill) {
-      setInputValue(prefill);
+    if (params.prefill) {
+      setInputValue(params.prefill);
       // Optionnel: Effacer le paramètre pour qu'il ne soit pas réutilisé si l'utilisateur navigue en arrière puis revient
       try {
           router.setParams({ prefill: '' }); 
@@ -286,7 +297,7 @@ const ChatInterface: React.FC = () => {
           console.warn("Could not clear prefill param: ", e)
       }
     }
-  }, [prefill, router]);
+  }, [params.prefill, router]);
 
   const sendMessage = async () => {
     if (inputValue.trim() === '') return;
@@ -305,16 +316,16 @@ const ChatInterface: React.FC = () => {
 
     try {
       // MODIFICATION: Use user from AuthContext directly
-      if (!authContextUser || !authContextUser.id || !authContextUser.email) { 
-        console.error('ChatInterface: User data missing or incomplete from AuthContext.', authContextUser);
+      if (!user || !user.id || !user.email) { 
+        console.error('ChatInterface: User data missing or incomplete from AuthContext.', user);
         showModal("Erreur d'Authentification", "Vos informations utilisateur sont incomplètes ou manquantes. Veuillez vous reconnecter.");
         setMessages(prev => prev.filter(msg => msg.id !== userMessage.id)); // Remove optimistic user message
         setIsLoading(false);
         return; 
       }
 
-      const userId = authContextUser.id;
-      const userEmail = authContextUser.email;
+      const userId = user.id;
+      const userEmail = user.email;
       // Fin de la MODIFICATION
 
       const response = await fetch('https://n8n-nw6a.onrender.com/webhook/moncoach', {
@@ -360,6 +371,13 @@ const ChatInterface: React.FC = () => {
     } finally {
         setIsLoading(false); 
     }
+  };
+
+  // Helper to show modal
+  const showModal = (title: string, message: string) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalVisible(true);
   };
 
   return (
@@ -456,18 +474,24 @@ const ChatInterface: React.FC = () => {
             returnKeyType="send"
             placeholderTextColor={Colors[colorScheme].tabIconDefault}
           />
-          <TouchableOpacity
+          <Pressable
             onPress={sendMessage}
             disabled={inputValue.trim() === '' || isLoading}
-            style={[styles.sendButton, (inputValue.trim() === '' || isLoading) && styles.sendButtonDisabled]}
-            activeOpacity={0.7}
+            style={({ pressed }) => [
+              styles.sendButton,
+              (inputValue.trim() === '' || isLoading) && styles.sendButtonDisabled,
+              {
+                opacity: pressed ? 0.7 : 1,
+                transform: [{ scale: pressed ? 0.95 : 1 }],
+              },
+            ]}
           >
             {isLoading ? (
               <ActivityIndicator size="small" color={Colors[colorScheme].buttonText} />
             ) : (
               <Send width={20} height={20} color={Colors[colorScheme].buttonText} />
             )}
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

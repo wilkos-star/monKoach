@@ -12,6 +12,7 @@ import {
   MenuOption, 
   MenuTrigger 
 } from 'react-native-popup-menu';
+import ObjectifSqueletteItem from '@/components/ui/skeletons/ObjectifSqueletteItem';
 
 // Mettre à jour le type pour correspondre à la table Supabase
 type GrandObjectif = {
@@ -47,6 +48,8 @@ export default function GrandsObjectifsScreen() {
     setModalVisible(true);
   };
 
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+
   const fetchObjectifs = async () => {
     if (!user) {
       setLoading(false); 
@@ -81,15 +84,23 @@ export default function GrandsObjectifsScreen() {
   };
 
   const handleUpdateStatus = async (id: string, newStatus: 'Terminé' | 'Abandonné' | 'En cours') => {
-    const { data, error } = await updateGrandObjectifStatus(id, newStatus);
-    if (error) {
-      showModal('Erreur', `Impossible de mettre à jour le statut de l'objectif.`);
-    } else if (data) {
-      setObjectifs(prevObjectifs =>
-        prevObjectifs.map(obj =>
-          obj.id === id ? { ...obj, statut: newStatus } : obj
-        )
-      );
+    setUpdatingStatusId(id);
+    try {
+      const { data, error } = await updateGrandObjectifStatus(id, newStatus);
+      if (error) {
+        showModal('Erreur', `Impossible de mettre à jour le statut de l'objectif.`);
+      } else if (data) {
+        setObjectifs(prevObjectifs =>
+          prevObjectifs.map(obj =>
+            obj.id === id ? { ...obj, statut: newStatus } : obj
+          )
+        );
+      }
+    } catch (e: any) {
+        // Gérer les erreurs inattendues de l'appel async si besoin
+        showModal('Erreur Inattendue', e?.message || `Une erreur est survenue lors de la mise à jour.`);
+    } finally {
+      setUpdatingStatusId(null);
     }
   };
 
@@ -117,13 +128,20 @@ export default function GrandsObjectifsScreen() {
   const renderItem = ({ item }: { item: GrandObjectif }) => {
     const isCompletedOrAbandoned = item.statut === 'Terminé' || item.statut === 'Abandonné';
     const iconSize = width > 768 ? 24 : 22;
+    const isUpdatingThisItem = updatingStatusId === item.id;
     
     return (
       <View style={styles.itemContainer}>
-        <TouchableOpacity 
-          onPress={() => handlePressObjectif(item.id, item.titre)} 
-          style={styles.itemContent}
-          activeOpacity={0.7}
+        <Pressable 
+          onPress={() => handlePressObjectif(item.id, item.titre)}
+          style={({ pressed }) => [
+            styles.itemContent,
+            {
+              opacity: pressed ? 0.7 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }], // Slightly less scale for list items
+            },
+          ]}
+          disabled={isUpdatingThisItem} // Désactiver le clic pendant la mise à jour
         >
           <Text style={styles.itemTitle}>{item.titre}</Text>
           {item.statut && <Text style={[styles.itemDetail, getStatusStyle(item.statut)]}>Statut: {item.statut}</Text>}
@@ -132,40 +150,81 @@ export default function GrandsObjectifsScreen() {
               Deadline: {new Date(item.deadline).toLocaleDateString()}
             </Text>
           )}
-        </TouchableOpacity>
-        <Menu>
-          <MenuTrigger customStyles={{ triggerWrapper: styles.menuButton }}>
-            <MoreVertical size={iconSize} color={Colors[colorScheme].icon} />
-          </MenuTrigger>
-          <MenuOptions customStyles={{ optionsContainer: styles.menuOptionsContainer }}>
-            <MenuOption onSelect={() => handleRevoir(item.id)} text='Revoir avec Mon Koach' customStyles={{ optionText: styles.menuOptionText }} />
-            
-            {!isCompletedOrAbandoned ? (
-              <>
-                <MenuOption onSelect={() => handleUpdateStatus(item.id, 'Terminé')} text='Marquer comme terminé' customStyles={{ optionText: styles.menuOptionText }} />
-                <MenuOption onSelect={() => handleUpdateStatus(item.id, 'Abandonné')} customStyles={{ optionText: [styles.menuOptionText, styles.destructiveOption] }}>
-                  <Text style={[styles.menuOptionText, styles.destructiveOption]}>Abandonner cet objectif</Text>
-                </MenuOption>
-              </>
-            ) : (
-              <MenuOption onSelect={() => handleUpdateStatus(item.id, 'En cours')} text='Reprendre cet objectif' customStyles={{ optionText: styles.menuOptionText }} />
-            )}
-            
-          </MenuOptions>
-        </Menu>
+        </Pressable>
+        
+        {isUpdatingThisItem ? (
+          <View style={styles.menuButton}> {/* Utiliser le même style pour garder la dimension */} 
+            <ActivityIndicator size="small" color={Colors[colorScheme].tint} />
+          </View>
+        ) : (
+          <Menu>
+            <MenuTrigger customStyles={{ triggerWrapper: styles.menuButton }}>
+              <MoreVertical size={iconSize} color={Colors[colorScheme].icon} />
+            </MenuTrigger>
+            <MenuOptions customStyles={{ optionsContainer: styles.menuOptionsContainer }}>
+              <MenuOption onSelect={() => handleRevoir(item.id)} text='Revoir avec Mon Koach' customStyles={{ optionText: styles.menuOptionText }} />
+              
+              {!isCompletedOrAbandoned ? (
+                <>
+                  <MenuOption onSelect={() => handleUpdateStatus(item.id, 'Terminé')} text='Marquer comme terminé' customStyles={{ optionText: styles.menuOptionText }} />
+                  <MenuOption onSelect={() => handleUpdateStatus(item.id, 'Abandonné')} customStyles={{ optionText: [styles.menuOptionText, styles.destructiveOption] }}>
+                    <Text style={[styles.menuOptionText, styles.destructiveOption]}>Abandonner cet objectif</Text>
+                  </MenuOption>
+                </>
+              ) : (
+                <MenuOption onSelect={() => handleUpdateStatus(item.id, 'En cours')} text='Reprendre cet objectif' customStyles={{ optionText: styles.menuOptionText }} />
+              )}
+            </MenuOptions>
+          </Menu>
+        )}
       </View>
     );
   };
 
-  // Afficher un message si l'utilisateur n'est pas connecté
-  if (!user && !loading) {
-    return <View style={styles.centered}><Text style={styles.emptyText}>Veuillez vous connecter pour voir vos objectifs.</Text></View>;
-  }
+  const renderListEmptyComponent = () => {
+    return (
+      <View style={styles.emptyStateContainer}>
+        <Image 
+          source={require('@/assets/images/logo.png')} // Vous pourriez utiliser une illustration plus thématique ici
+          style={styles.emptyStateImage}
+        />
+        <Text style={styles.emptyStateTitle}>Commencez votre voyage !</Text>
+        <Text style={styles.emptyStateSubtitle}>
+          Vous n'avez pas encore défini d'objectifs. Quelle grande aventure souhaitez-vous entreprendre ?
+        </Text>
+        <Pressable
+          style={({ pressed }) => [
+            styles.emptyStateButton,
+            {
+              opacity: pressed ? 0.7 : 1,
+              transform: [{ scale: pressed ? 0.95 : 1 }],
+            },
+          ]}
+          onPress={() => router.push({ pathname: '/chat' })}
+        >
+          <Text style={styles.emptyStateButtonText}>Définir mon premier objectif</Text>
+        </Pressable>
+      </View>
+    );
+  };
 
   if (loading && !refreshing) {
     return (
-      <View style={styles.centered}><ActivityIndicator size="large" color={Colors[colorScheme].tint} /></View>
+      <View style={styles.container}>
+        <View style={styles.titleContainer}>
+          <Image source={require('@/assets/images/logo.png')} style={styles.logo} />
+          <Text style={styles.title}>Mes Objectifs</Text>
+        </View>
+        <ObjectifSqueletteItem />
+        <ObjectifSqueletteItem />
+        <ObjectifSqueletteItem />
+      </View>
     );
+  }
+
+  // Afficher un message si l'utilisateur n'est pas connecté
+  if (!user && !loading) {
+    return <View style={styles.centered}><Text style={styles.emptyText}>Veuillez vous connecter pour voir vos objectifs.</Text></View>;
   }
 
   return (
@@ -196,14 +255,16 @@ export default function GrandsObjectifsScreen() {
         <Text style={styles.title}>Mes Objectifs</Text>
       </View>
 
-      {/* Bouton pour définir un nouvel objectif */}
-      <TouchableOpacity 
-        style={styles.defineObjectiveButton}
-        onPress={() => router.push({ pathname: '/chat' })}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.defineObjectiveButtonText}>Définir un objectif avec Mon Koach</Text>
-      </TouchableOpacity>
+      {/* Bouton pour définir un nouvel objectif - Conditionnellement affiché */}
+      {objectifs.length > 0 && (
+        <TouchableOpacity 
+          style={styles.defineObjectiveButton}
+          onPress={() => router.push({ pathname: '/chat' })}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.defineObjectiveButtonText}>Définir un objectif avec Mon Koach</Text>
+        </TouchableOpacity>
+      )}
 
       <FlatList
         data={objectifs}
@@ -218,7 +279,7 @@ export default function GrandsObjectifsScreen() {
             colors={[Colors[colorScheme].tint]}
           />
         }
-        ListEmptyComponent={<Text style={styles.emptyText}>Aucun objectif trouvé.</Text>}
+        ListEmptyComponent={renderListEmptyComponent}
       />
     </View>
   );
@@ -423,6 +484,49 @@ const getStyles = (scheme: 'light' | 'dark' | null | undefined, screenWidth: num
       maxWidth: Platform.OS === 'web' ? 400 : undefined,
     },
     defineObjectiveButtonText: {
+      color: colors.buttonText,
+      fontSize: isWideScreen ? 17 : 16,
+      fontWeight: '600',
+    },
+    emptyStateContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+      marginTop: 50, // Un peu d'espace par rapport au titre de la page
+    },
+    emptyStateImage: {
+      width: isWideScreen ? 120 : 100,
+      height: isWideScreen ? 120 : 100,
+      marginBottom: 25,
+      opacity: 0.7,
+    },
+    emptyStateTitle: {
+      fontSize: isWideScreen ? 22 : 20,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+      textAlign: 'center',
+      marginBottom: 10,
+    },
+    emptyStateSubtitle: {
+      fontSize: isWideScreen ? 16 : 14,
+      color: colors.text,
+      textAlign: 'center',
+      marginBottom: 25,
+      lineHeight: isWideScreen ? 24 : 20,
+    },
+    emptyStateButton: {
+      backgroundColor: colors.tint,
+      paddingVertical: isWideScreen ? 14 : 12,
+      paddingHorizontal: isWideScreen ? 30 : 25,
+      borderRadius: isWideScreen ? 10 : 8,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+    },
+    emptyStateButtonText: {
       color: colors.buttonText,
       fontSize: isWideScreen ? 17 : 16,
       fontWeight: '600',

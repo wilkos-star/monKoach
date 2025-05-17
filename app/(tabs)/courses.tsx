@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   View, Text, SectionList, StyleSheet, ActivityIndicator, 
   RefreshControl, TouchableOpacity, Image, useWindowDimensions, Platform, 
-  LayoutAnimation, UIManager, Animated
+  LayoutAnimation, UIManager, Animated, Pressable
 } from 'react-native';
 import { getCourses, getUserStartedCourseIds, getChapters, getCompletedChapters } from '@/lib/supabase';
 import { Colors } from '@/constants/Colors';
@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { BookOpen } from 'lucide-react-native';
 import { useAuth } from '@/providers/AuthProvider';
 import { useIsFocused } from '@react-navigation/native';
+import CoursSqueletteItem from '@/components/ui/skeletons/CoursSqueletteItem';
 
 // Type pour les cours
 type Course = {
@@ -42,6 +43,8 @@ export default function CoursesScreen() {
   const router = useRouter();
   const isFocused = useIsFocused(); // Hook pour savoir si l'écran est focus
   const opacity = useRef(new Animated.Value(0)).current; // Valeur animée pour l'opacité
+  const colors = Colors[colorScheme]; // 'colors' is defined here for the component
+  const isWideScreen = width > 768; // 'isWideScreen' is defined here
 
   useEffect(() => {
     if (isFocused) {
@@ -193,10 +196,15 @@ export default function CoursesScreen() {
   }, [allCourses, startedCourseIds, completedCourseIds]);
 
   const renderItem = ({ item }: { item: Course }) => (
-    <TouchableOpacity 
-      style={styles.itemContainer} 
+    <Pressable 
+      style={({ pressed }) => [
+        styles.itemContainer,
+        {
+          opacity: pressed ? 0.7 : 1,
+          transform: [{ scale: pressed ? 0.98 : 1 }], // Slightly less scale for list items
+        },
+      ]}
       onPress={() => handlePressCourse(item.id, item.title)}
-      activeOpacity={0.7}
     >
       {/* Afficher le logo si url_logo existe, sinon une icône placeholder */}
       {item.url_logo ? (
@@ -208,7 +216,7 @@ export default function CoursesScreen() {
       )}
       {/* Afficher seulement le titre à côté */}
       <Text style={styles.itemTitle}>{item.title}</Text>
-    </TouchableOpacity>
+    </Pressable>
   );
 
   const renderSectionHeader = ({ section: { title } }: { section: { title: string } }) => (
@@ -217,8 +225,43 @@ export default function CoursesScreen() {
       </View>
   );
 
+  const renderListEmptyComponent = () => {
+    return (
+      <View style={styles.emptyStateContainer}>
+        <BookOpen size={isWideScreen ? 60 : 50} color={colors.icon} style={styles.emptyStateIcon} />
+        <Text style={styles.emptyStateTitle}>Prêt à apprendre ?</Text>
+        <Text style={styles.emptyStateSubtitle}>
+          Aucun cours n'a été trouvé pour le moment. Explorez notre catalogue pour découvrir de nouvelles compétences !
+        </Text>
+        <Pressable 
+          style={({ pressed }) => [
+            styles.emptyStateButton,
+            {
+              opacity: pressed ? 0.7 : 1,
+              transform: [{ scale: pressed ? 0.95 : 1 }],
+            },
+          ]}
+          onPress={() => console.log("'Explorer les cours' button pressed")}
+        >
+          <Text style={styles.emptyStateButtonText}>Explorer les cours</Text>
+        </Pressable>
+      </View>
+    );
+  };
+
   if (loading && !refreshing) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color={Colors[colorScheme].tint} /></View>;
+    // Afficher les squelettes pendant le chargement initial
+    return (
+      <Animated.View style={[styles.container, { opacity: opacity }]}>
+        <Text style={styles.title}>Catalogue des Cours</Text>
+        <View style={{width: '100%'}}> {/* Conteneur pour que les items prennent la bonne largeur*/}
+            <CoursSqueletteItem />
+            <CoursSqueletteItem />
+            <CoursSqueletteItem />
+            <CoursSqueletteItem />
+        </View>
+      </Animated.View>
+    );
   }
 
   return (
@@ -237,11 +280,11 @@ export default function CoursesScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={Colors[colorScheme].tint}
-              colors={[Colors[colorScheme].tint]}
+              tintColor={colors.tint}
+              colors={[colors.tint]}
             />
           }
-          ListEmptyComponent={<Text style={styles.emptyText}>Aucun cours trouvé.</Text>}
+          ListEmptyComponent={renderListEmptyComponent}
         />
       ) : (
         <View style={styles.centered}><Text style={styles.emptyText}>Veuillez vous connecter pour voir vos cours.</Text></View>
@@ -340,6 +383,47 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
         fontSize: isWideScreen ? 20 : 18,
         fontWeight: 'bold',
         color: colors.textPrimary,
+    },
+    emptyStateContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+      marginTop: 40,
+    },
+    emptyStateIcon: {
+      marginBottom: 25,
+      opacity: 0.6,
+    },
+    emptyStateTitle: {
+      fontSize: isWideScreen ? 22 : 20,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+      textAlign: 'center',
+      marginBottom: 10,
+    },
+    emptyStateSubtitle: {
+      fontSize: isWideScreen ? 16 : 14,
+      color: colors.text,
+      textAlign: 'center',
+      marginBottom: 25,
+      lineHeight: isWideScreen ? 24 : 20,
+    },
+    emptyStateButton: {
+      backgroundColor: colors.tint,
+      paddingVertical: isWideScreen ? 14 : 12,
+      paddingHorizontal: isWideScreen ? 30 : 25,
+      borderRadius: isWideScreen ? 10 : 8,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+    },
+    emptyStateButtonText: {
+      color: colors.buttonText,
+      fontSize: isWideScreen ? 17 : 16,
+      fontWeight: '600',
     },
   });
 }; 
