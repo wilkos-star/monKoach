@@ -73,6 +73,7 @@ function InitialLayout() {
       <Stack.Screen name="welcome" options={{ headerShown: false }} />
       <Stack.Screen name="auth/PhoneNumberScreen" options={{ headerShown: false }} />
       <Stack.Screen name="auth/VerificationScreen" options={{ headerShown: false }} />
+      <Stack.Screen name="auth/AdditionalInfoScreen" options={{ title: "Complétez Votre Profil", headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="objectif-details" />
       <Stack.Screen name="course-details" />
