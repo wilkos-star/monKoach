@@ -6,7 +6,7 @@ import { useAuth } from '@/providers/AuthProvider'; // Corrected path
 import { Colors } from '../../constants/Colors'; // Assuming you have this
 import { useColorScheme } from '@/hooks/useColorScheme'; // Ensure this is imported
 
-const VERIFICATION_URL_PREFIX = 'https://wa.me/22958082628?text=confirmer';
+const VERIFICATION_WA_LINK = 'https://wa.me/22958082628?text=confirmer';
 const POLLING_INTERVAL = 5000; // 5 seconds
 
 const VerificationScreen = () => {
@@ -71,8 +71,26 @@ const VerificationScreen = () => {
                             console.warn('Auth object or signInUser method not available.');
                             showModal('Login Error', 'Could not complete login process. Please restart the app.');
                         }
-                        if (!modalVisible) { 
-                           router.replace('/(tabs)' as any); 
+                        
+                        // Check if additional info is needed before redirecting from VerificationScreen
+                        if (userData.nom && userData.email) {
+                            if (!modalVisible) { // Ensure modal isn't trying to show something else
+                               router.replace('/(tabs)/chat'); 
+                            }
+                        } else {
+                            if (!modalVisible) {
+                                router.replace({
+                                    pathname: '/auth/AdditionalInfoScreen',
+                                    params: {
+                                        userId: userId, // userId from VerificationScreen params
+                                        authToken: userData.auth_token,
+                                        phoneNumber: phoneNumber, // phoneNumber from VerificationScreen params
+                                        currentNom: userData.nom || '',
+                                        // Add currentEmail if AdditionalInfoScreen uses it, otherwise it's optional
+                                        // currentEmail: userData.email || '' 
+                                    }
+                                });
+                            }
                         }
                     }
                 } catch (e: any) {
@@ -85,11 +103,9 @@ const VerificationScreen = () => {
     }, [userId, router, auth, isAwaitingWhatsApp, modalVisible]);
 
     const handleConfirmViaWhatsApp = async () => {
-        if (!phoneNumber) {
-            showModal('Error', 'Phone number not available.');
-            return;
-        }
-        const url = `${VERIFICATION_URL_PREFIX}${phoneNumber}`;
+        // The phoneNumber prop is for the user being verified, not the target of the WhatsApp message.
+        // The link is fixed to VERIFICATION_WA_LINK.
+        const url = VERIFICATION_WA_LINK;
         try {
             const supported = await Linking.canOpenURL(url);
             if (supported) {
