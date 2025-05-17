@@ -29,9 +29,24 @@ function InitialLayout() {
     const isWelcomeScreen = currentRoute === 'welcome';
 
     if (user) {
-      if (isAuthScreen || isWelcomeScreen) {
-        console.log('User authenticated, redirecting from auth/welcome to /chat');
-        router.replace('/(tabs)/chat');
+      if (user.nom && user.email) {
+        if (isAuthScreen || isWelcomeScreen) {
+          console.log('(RootLayout) User authenticated, profile complete, redirecting from auth/welcome to /chat');
+          router.replace('/(tabs)/chat');
+        }
+      } else {
+        if (currentRoute !== 'auth/AdditionalInfoScreen') {
+          console.log('(RootLayout) User authenticated, profile incomplete, redirecting to /auth/AdditionalInfoScreen');
+          router.replace({
+            pathname: '/auth/AdditionalInfoScreen',
+            params: { 
+              userId: user.id, 
+              authToken: user.auth_token, 
+              phoneNumber: user.phone_number, 
+              currentNom: user.nom || ''
+            }
+          });
+        }
       }
     } else {
       if (!isAuthScreen && !isWelcomeScreen) {
