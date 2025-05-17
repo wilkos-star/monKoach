@@ -22,10 +22,15 @@ export default function TabLayout() {
       return;
     }
 
-    if (user && (!user.email || !user.nom) && pathname !== '/auth/AdditionalInfoScreen') {
-      console.log('(tabs)/_layout: User profile incomplete, redirecting to AdditionalInfoScreen from:', pathname, user);
-      router.replace('/auth/AdditionalInfoScreen');
-    } else if (!user && pathname !== '/auth/PhoneNumberScreen' && pathname !== '/auth/VerificationScreen' && pathname !== '/auth/AdditionalInfoScreen' && pathname !== '/auth/auth') {
+    // La logique de redirection vers AdditionalInfoScreen a été déplacée 
+    // vers les écrans d'authentification (ex: VerificationScreen)
+    // ou devrait être gérée par un layout racine si une protection globale est nécessaire.
+    // if (user && (!user.email || !user.nom) && pathname !== '/auth/AdditionalInfoScreen') {
+    //   console.log('(tabs)/_layout: User profile incomplete, redirecting to AdditionalInfoScreen from:', pathname, user);
+    //   router.replace('/auth/AdditionalInfoScreen');
+    // } else 
+    if (!user && pathname !== '/auth/PhoneNumberScreen' && pathname !== '/auth/VerificationScreen' && pathname !== '/auth/AdditionalInfoScreen' && pathname !== '/auth/auth') {
+      // Ce console.log est utile pour le débogage, pour s'assurer que le layout racine gère bien la redirection des non-connectés.
       console.log('(tabs)/_layout: No user, not on auth screen. Root layout should handle redirection to login.', pathname);
     }
   }, [user, loading, router, pathname]);
