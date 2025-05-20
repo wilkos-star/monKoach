@@ -390,6 +390,7 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
       alignItems: 'center',
       padding: 20,
       marginTop: 40,
+      backgroundColor: colors.background,
     },
     emptyStateIcon: {
       marginBottom: 25,

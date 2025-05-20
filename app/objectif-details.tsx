@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Platform, TouchableOpacity, useWindowDimensions, Modal, Pressable } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, Platform, TouchableOpacity, useWindowDimensions, Modal, Pressable, Animated } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { getMiniObjectifs, updateMiniObjectifStatus } from '@/lib/supabase';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { MoreVertical } from 'lucide-react-native';
+import { MoreVertical, CheckCircle2, Clock, AlertCircle } from 'lucide-react-native';
 import { 
   Menu, 
   MenuOptions, 
@@ -96,20 +96,53 @@ export default function ObjectifDetailsScreen() {
     }
   };
 
-  const renderItem = ({ item }: { item: MiniObjectif }) => {
+  const renderItem = ({ item, index }: { item: MiniObjectif; index: number }) => {
     const isCompletedOrAbandoned = item.statut === 'Terminé' || item.statut === 'Abandonné';
     const iconSize = width > 768 ? 24 : 22;
     
+    const getStatusIcon = (status: string | null) => {
+      switch (status) {
+        case 'Terminé':
+          return <CheckCircle2 size={20} color="#28a745" style={styles.statusIcon} />;
+        case 'Abandonné':
+          return <AlertCircle size={20} color="#dc3545" style={styles.statusIcon} />;
+        case 'En cours':
+        default:
+          return <Clock size={20} color={Colors[colorScheme].text} style={styles.statusIcon} />;
+      }
+    };
+
     return (
-      <View style={styles.itemContainer}>
+      <Animated.View 
+        style={[
+          styles.itemContainer,
+          {
+            opacity: 1,
+            transform: [{ translateY: 0 }],
+          }
+        ]}
+      >
         <View style={styles.itemContent}>
           <Text style={styles.itemTitle}>{item.mini_objectif || 'Mini objectif sans titre'}</Text>
-          {item.details_miniobjectifs && <Text style={styles.itemDetail}>Détails: {item.details_miniobjectifs}</Text>}
-          {item.statut && <Text style={[styles.itemDetail, getStatusStyle(item.statut)]}>Statut: {item.statut}</Text>}
-          {item.deadline && (
+          {item.details_miniobjectifs && (
             <Text style={styles.itemDetail}>
-              Deadline: {new Date(item.deadline).toLocaleDateString()}
+              {item.details_miniobjectifs}
             </Text>
+          )}
+          <View style={styles.statusContainer}>
+            {getStatusIcon(item.statut)}
+            {item.statut && (
+              <Text style={[styles.itemDetail, getStatusStyle(item.statut)]}>
+                {item.statut}
+              </Text>
+            )}
+          </View>
+          {item.deadline && (
+            <View style={styles.deadlineContainer}>
+              <Text style={[styles.itemDetail, styles.deadlineText]}>
+                Échéance: {new Date(item.deadline).toLocaleDateString()}
+              </Text>
+            </View>
           )}
         </View>
         <Menu>
@@ -125,7 +158,7 @@ export default function ObjectifDetailsScreen() {
             )}
           </MenuOptions>
         </Menu>
-      </View>
+      </Animated.View>
     );
   };
 
@@ -193,65 +226,95 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
       alignSelf: Platform.OS === 'web' ? 'center' : undefined,
     },
     headerTitle: {
-        fontSize: isWideScreen ? 22 : 20,
-        fontWeight: 'bold',
-        color: colors.textPrimary,
-        marginBottom: isWideScreen ? 25 : 20,
-        paddingHorizontal: 15,
-        textAlign: 'center',
+      fontSize: isWideScreen ? 24 : 22,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+      marginBottom: isWideScreen ? 30 : 24,
+      paddingHorizontal: 15,
+      textAlign: 'center',
+      letterSpacing: 0.5,
     },
     itemContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: colors.card,
-      paddingVertical: isWideScreen ? 18 : 10,
-      paddingLeft: isWideScreen ? 20 : 15,
-      paddingRight: isWideScreen ? 10 : 5,
-      borderRadius: isWideScreen ? 12 : 10,
-      marginBottom: isWideScreen ? 20 : 15,
+      paddingVertical: isWideScreen ? 20 : 15,
+      paddingLeft: isWideScreen ? 22 : 18,
+      paddingRight: isWideScreen ? 12 : 8,
+      borderRadius: isWideScreen ? 16 : 12,
+      marginBottom: isWideScreen ? 24 : 18,
       borderWidth: 1,
       borderColor: colors.borderColor,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 3,
     },
     itemContent: {
       flex: 1,
-      marginRight: isWideScreen ? 10 : 5,
+      marginRight: isWideScreen ? 12 : 8,
     },
     itemTitle: {
-      fontSize: isWideScreen ? 17 : 16,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: isWideScreen ? 10 : 8,
+      fontSize: isWideScreen ? 18 : 16,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      marginBottom: isWideScreen ? 12 : 8,
     },
     itemDetail: {
       fontSize: isWideScreen ? 15 : 14,
       color: colors.text,
-      marginBottom: isWideScreen ? 6 : 4,
+      marginBottom: isWideScreen ? 8 : 6,
+      lineHeight: 20,
+    },
+    statusContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: isWideScreen ? 8 : 6,
+    },
+    statusIcon: {
+      marginRight: 8,
+    },
+    deadlineContainer: {
+      backgroundColor: colors.background,
+      padding: 8,
+      borderRadius: 6,
+      marginTop: 4,
+    },
+    deadlineText: {
+      color: colors.text,
+      fontSize: isWideScreen ? 14 : 13,
+      opacity: 0.7,
+    },
+    menuButton: {
+      padding: isWideScreen ? 14 : 12,
+      backgroundColor: colors.background,
+      borderRadius: 8,
+    },
+    menuOptionsContainer: {
+      marginTop: isWideScreen ? 40 : 35,
+      borderRadius: 12,
+      backgroundColor: colors.card,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 6,
+      borderColor: colors.borderColor,
+      borderWidth: 1,
+      padding: 8,
+    },
+    menuOptionText: {
+      fontSize: isWideScreen ? 16 : 15,
+      paddingVertical: isWideScreen ? 14 : 12,
+      paddingHorizontal: isWideScreen ? 20 : 16,
+      color: colors.text,
+      fontWeight: '500',
     },
     emptyText: {
       textAlign: 'center',
       marginTop: 30,
       fontSize: isWideScreen ? 18 : 16,
-      color: colors.text,
-    },
-    menuButton: { 
-      padding: isWideScreen ? 12 : 10, 
-    },
-    menuOptionsContainer: {
-      marginTop: isWideScreen ? 35 : 30,
-      borderRadius: 8,
-      backgroundColor: colors.card,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.15,
-      shadowRadius: 5,
-      elevation: 5,
-      borderColor: colors.borderColor,
-      borderWidth: 1,
-    },
-    menuOptionText: { 
-      fontSize: isWideScreen ? 17 : 16,
-      paddingVertical: isWideScreen ? 12 : 10,
-      paddingHorizontal: isWideScreen ? 18 : 15,
       color: colors.text,
     },
     destructiveOption: { 

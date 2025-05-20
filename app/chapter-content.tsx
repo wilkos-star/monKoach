@@ -34,7 +34,12 @@ type QuizData = {
 const getMarkdownStyles = (colors: typeof Colors.light | typeof Colors.dark, screenWidth: number) => {
   const isWideScreen = screenWidth > 768;
   return StyleSheet.create({
-    body: { color: colors.text, fontSize: isWideScreen ? 17 : 16, lineHeight: isWideScreen ? 26 : 24 },
+    body: { 
+      color: colors.text, 
+      fontSize: isWideScreen ? 17 : 16, 
+      lineHeight: isWideScreen ? 26 : 24,
+      backgroundColor: colors.card,
+    },
     heading1: { fontSize: isWideScreen ? 28 : 24, fontWeight: 'bold', color: colors.textPrimary, marginTop: 15, marginBottom: 10, borderBottomWidth: 1, borderColor: colors.borderColor, paddingBottom: 5 },
     heading2: { fontSize: isWideScreen ? 22 : 20, fontWeight: 'bold', color: colors.textPrimary, marginTop: 10, marginBottom: 8 },
     paragraph: { marginBottom: 10, flexWrap: 'wrap' },
@@ -45,6 +50,20 @@ const getMarkdownStyles = (colors: typeof Colors.light | typeof Colors.dark, scr
     link: { color: colors.tint, textDecorationLine: 'underline' }, 
     strong: { fontWeight: 'bold' },
     em: { fontStyle: 'italic' },
+    blockquote: {
+      backgroundColor: colors.background, // Ou une autre nuance. Si colors.card est le fond du contenu, colors.background (fond de page) peut bien rendre.
+                                        // Si colors.background est trop similaire à colors.card, vous pourriez avoir besoin d'une couleur dédiée.
+                                        // Par exemple: colorScheme === 'dark' ? '#252525' : '#f0f0f0'
+      padding: isWideScreen ? 15 : 10,
+      marginVertical: 10,
+      marginLeft: 0, // Le style par défaut peut ajouter un marginLeft que vous voudrez peut-être écraser
+      borderLeftWidth: 4,
+      borderLeftColor: colors.tint,
+      borderRadius: 4, // Optionnel, pour des bords arrondis
+      // Le texte à l'intérieur du blockquote héritera de `body` pour sa couleur,
+      // mais vous pouvez le spécifier ici si vous voulez une couleur différente pour le texte du blockquote.
+      // color: colors.textSecondary, // Par exemple, si vous voulez un texte légèrement différent.
+    },
   });
 };
 
@@ -139,14 +158,14 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
     },
     quizOptionSelected: {
       borderColor: colors.tint,
-      backgroundColor: scheme === 'light' ? '#EAE0D5' : '#333',
+      backgroundColor: scheme === 'light' ? '#EAE0D5' : '#222',
     },
     quizOptionCorrect: {
-      backgroundColor: '#d4edda',
+      backgroundColor: scheme === 'light' ? '#d4edda' : '#234d2c',
       borderColor: '#28a745',
     },
     quizOptionIncorrect: {
-      backgroundColor: '#f8d7da',
+      backgroundColor: scheme === 'light' ? '#f8d7da' : '#4d2323',
       borderColor: '#dc3545',
     },
     quizOptionText: {
@@ -164,7 +183,7 @@ const getStyles = (scheme: 'light' | 'dark', screenWidth: number) => {
       backgroundColor: colors.tabIconDefault,
     },
     retryButton: { 
-       backgroundColor: '#ffc107',
+       backgroundColor: scheme === 'light' ? '#ffc107' : '#665200',
     },
     submitButtonText: {
       color: colors.buttonText,
