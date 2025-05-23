@@ -31,8 +31,8 @@ function InitialLayout() {
     if (user) {
       if (user.nom && user.email) {
         if (isAuthScreen || isWelcomeScreen) {
-          console.log('(RootLayout) User authenticated, profile complete, redirecting from auth/welcome to /chat');
-          router.replace('/(tabs)/chat');
+          console.log('(RootLayout) User authenticated, profile complete, redirecting from auth/welcome to /accueil');
+          router.replace('/(tabs)/accueil');
         }
       } else {
         if (currentRoute !== 'auth/AdditionalInfoScreen') {
@@ -75,6 +75,7 @@ function InitialLayout() {
       <Stack.Screen name="auth/VerificationScreen" options={{ headerShown: false }} />
       <Stack.Screen name="auth/AdditionalInfoScreen" options={{ title: "Complétez Votre Profil", headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="outil30jours" options={{ headerShown: false }} />
       <Stack.Screen name="objectif-details" />
       <Stack.Screen name="course-details" />
       <Stack.Screen name="chapter-list" />

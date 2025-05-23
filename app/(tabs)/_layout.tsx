@@ -1,7 +1,7 @@
 import { Tabs, useRouter, useSegments, usePathname } from 'expo-router';
 import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
-import { Target, User, BookOpen } from 'lucide-react-native';
+import { Target, User, BookOpen, MessageCircle, Home } from 'lucide-react-native';
 
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -51,10 +51,17 @@ export default function TabLayout() {
           }),
         }}>
         <Tabs.Screen
+          name="accueil"
+          options={{
+            title: 'Accueil',
+            tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
           name="chat"
           options={{
             title: 'Chat',
-            tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+            tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />,
           }}
         />
         <Tabs.Screen
