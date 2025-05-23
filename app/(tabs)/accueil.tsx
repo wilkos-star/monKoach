@@ -14,7 +14,6 @@ type AppPath =
   | '/(tabs)/chat' 
   | '/(tabs)/grands-objectifs' 
   | '/(tabs)/courses' 
-  | '/(tabs)/profile' 
   | '/outil30jours';
 
 type NavItem = {
@@ -26,10 +25,9 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { name: '/(tabs)/chat', label: 'Chat avec Koach', icon: MessageCircle },
+  { name: '/outil30jours', label: '1 Outil 30 Jours', icon: Briefcase },
   { name: '/(tabs)/grands-objectifs', label: 'Mes Objectifs', icon: Target },
   { name: '/(tabs)/courses', label: 'Mes Cours', icon: BookOpen },
-  { name: '/outil30jours', label: '1 Outil 30 Jours', icon: Briefcase },
-  { name: '/(tabs)/profile', label: 'Mon Profil', icon: User },
 ];
 
 export default function AccueilScreen() {
