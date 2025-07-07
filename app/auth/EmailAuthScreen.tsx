@@ -1,56 +1,70 @@
 import React, { useState } from 'react';
 import { View, TextInput, Button, StyleSheet, ActivityIndicator, Text, useWindowDimensions, Platform, Modal, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { upsertUserByPhoneNumber } from '../../lib/supabase';
-import { Colors } from '../../constants/Colors'; 
+import { upsertUserByEmail } from '../../lib/supabase';
+import { Colors } from '../../constants/Colors';
 import { useAuth, WhatsAppUser } from '@/providers/AuthProvider';
 
-const PhoneNumberScreen = () => {
-    const [phoneNumber, setPhoneNumber] = useState('');
+const EmailAuthScreen = () => {
+    const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const router = useRouter();
     const auth = useAuth();
     const { width } = useWindowDimensions();
 
-    const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
-    const [errorModalVisible, setErrorModalVisible] = useState(false);
+    const [modalVisible, setModalVisible] = useState(false);
     const [modalTitle, setModalTitle] = useState('');
     const [modalMessage, setModalMessage] = useState('');
-    const [verificationParams, setVerificationParams] = useState<{ userId: string; phoneNumber: string | null | undefined } | null>(null);
+    const [nextScreenParams, setNextScreenParams] = useState<any>(null);
+    const [isConfirmation, setIsConfirmation] = useState(false);
 
     const isWideScreen = width > 768;
 
-    const showErrorModal = (title: string, message: string) => {
+    const showModal = (title: string, message: string, params: any = null, confirmation = false) => {
         setModalTitle(title);
         setModalMessage(message);
-        setErrorModalVisible(true);
+        setNextScreenParams(params);
+        setIsConfirmation(confirmation);
+        setModalVisible(true);
     };
 
+    const handleModalAction = () => {
+        setModalVisible(false);
+        if (nextScreenParams) {
+            router.push(nextScreenParams);
+        }
+    };
+    
     const handleContinue = async () => {
-        if (!phoneNumber.trim()) {
-            showErrorModal('Erreur', 'Veuillez entrer votre numéro de téléphone WhatsApp.');
+        const trimmedEmail = email.trim();
+        if (!trimmedEmail) {
+            showModal('Erreur', 'Veuillez entrer votre adresse email.');
             return;
         }
-        if (!/^\+[1-9]\d{9,14}$/.test(phoneNumber)) {
-             showErrorModal('Numéro Invalide', 'Veuillez entrer un numéro de téléphone valide commençant par + et suivi d\'au moins 10 chiffres (ex: +336123456789).');
-             return;
+        if (!/\S+@\S+\.\S+/.test(trimmedEmail)) {
+            showModal('Email Invalide', 'Veuillez entrer une adresse e-mail valide.');
+            return;
         }
 
         setLoading(true);
         try {
-            const { data: userData, error } = await upsertUserByPhoneNumber(phoneNumber);
+            const { data: userData, error } = await upsertUserByEmail(trimmedEmail);
 
             if (error || !userData) {
-                showErrorModal('Erreur', error?.message || 'Une erreur est survenue lors de la récupération des données utilisateur.');
                 setLoading(false);
+                showModal('Erreur', error?.message || 'Une erreur est survenue lors de la récupération des données utilisateur.');
                 return;
             }
 
+            // Si l'utilisateur est déjà vérifié, on le connecte directement
             if (userData.is_verified) {
+                const expirationTime = new Date().getTime() + 30 * 24 * 60 * 60 * 1000; // 30 jours en millisecondes
+                localStorage.setItem('tokenExpiration', expirationTime.toString());
+                localStorage.setItem('userId', userData.id);
+                localStorage.setItem('userToken', userData.auth_token);
+                auth.signInUser(userData as WhatsAppUser);
+
                 if (userData.email && userData.nom) {
-                    localStorage.setItem('userId', userData.id);
-                    localStorage.setItem('userToken', userData.auth_token);
-                    auth.signInUser(userData as WhatsAppUser);
                     router.replace('/(tabs)/chat');
                 } else {
                     router.push({
@@ -58,22 +72,29 @@ const PhoneNumberScreen = () => {
                         params: { 
                             userId: userData.id, 
                             authToken: userData.auth_token,
-                            phoneNumber: userData.phone_number,
                             currentNom: userData.nom || '' 
                         }
                     });
                 }
-            } else {
-                setVerificationParams({ userId: userData.id, phoneNumber: userData.phone_number });
-                setModalTitle('Confirmez votre numéro');
-                setModalMessage(`Est-ce que ${phoneNumber} est bien votre numéro WhatsApp ?`);
-                setConfirmationModalVisible(true);
+                return; // On arrête l'exécution ici
             }
 
+            // Si l'utilisateur n'est pas vérifié, on envoie le code et on va à l'écran de vérification
+            fetch('https://n8n-nw6a.onrender.com/webhook/09686b59-9edd-46a6-a2d5-5620326b2eeb', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: trimmedEmail }),
+            }).catch(webhookError => console.error('Erreur Webhook:', webhookError));
+
+            router.push({
+                pathname: '/auth/VerificationScreen',
+                params: { userId: userData.id, email: userData.email }
+            });
+
         } catch (e: any) {
-            showErrorModal('Erreur Inattendue', e.message || 'Une erreur inconnue est survenue.');
-        } finally {
-        }
+            setLoading(false);
+            showModal('Erreur Inattendue', e.message || 'Une erreur inconnue est survenue.');
+        } 
     };
 
     return (
@@ -81,76 +102,57 @@ const PhoneNumberScreen = () => {
             <Modal
                 animationType="fade"
                 transparent={true}
-                visible={confirmationModalVisible}
+                visible={modalVisible}
                 onRequestClose={() => {
-                    setConfirmationModalVisible(false);
-                    setLoading(false); 
+                    setModalVisible(false);
+                    if (!isConfirmation) setLoading(false);
                 }}
             >
                 <View style={styles.centeredView}>
                     <View style={styles.modalView}>
                         <Text style={styles.modalTitle}>{modalTitle}</Text>
                         <Text style={styles.modalText}>{modalMessage}</Text>
-                        <View style={styles.modalButtonContainer}>
+                        {isConfirmation ? (
+                            <View style={styles.modalButtonContainer}>
+                                <Pressable
+                                    style={[styles.modalButton, styles.buttonCancel]}
+                                    onPress={() => {
+                                        setModalVisible(false);
+                                        setLoading(false);
+                                    }}
+                                >
+                                    <Text style={styles.modalButtonText}>Annuler</Text>
+                                </Pressable>
+                                <Pressable
+                                    style={[styles.modalButton, styles.buttonConfirm]}
+                                    onPress={handleModalAction}
+                                >
+                                    <Text style={styles.modalButtonText}>Confirmer</Text>
+                                </Pressable>
+                            </View>
+                        ) : (
                             <Pressable
-                                style={[styles.modalButton, styles.buttonCancel]}
-                                onPress={() => {
-                                    setConfirmationModalVisible(false);
-                                    setLoading(false);
-                                }}
+                                style={[styles.modalButton, styles.buttonConfirm, { width: '100%' }]}
+                                onPress={() => setModalVisible(false)}
                             >
-                                <Text style={styles.modalButtonText}>Annuler</Text>
+                                <Text style={styles.modalButtonText}>OK</Text>
                             </Pressable>
-                            <Pressable
-                                style={[styles.modalButton, styles.buttonConfirm]}
-                                onPress={() => {
-                                    setConfirmationModalVisible(false);
-                                    if (verificationParams) {
-                                        router.push({
-                                            pathname: '/auth/VerificationScreen',
-                                            params: verificationParams
-                                        });
-                                    }
-                                }}
-                            >
-                                <Text style={styles.modalButtonText}>Confirmer</Text>
-                            </Pressable>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
-
-            <Modal
-                animationType="fade"
-                transparent={true}
-                visible={errorModalVisible}
-                onRequestClose={() => setErrorModalVisible(false)}
-            >
-                <View style={styles.centeredView}>
-                    <View style={styles.modalView}>
-                        <Text style={styles.modalTitle}>{modalTitle}</Text>
-                        <Text style={styles.modalText}>{modalMessage}</Text>
-                        <Pressable
-                            style={[styles.modalButton, styles.buttonConfirm, { width: '100%' }]}
-                            onPress={() => setErrorModalVisible(false)}
-                        >
-                            <Text style={styles.modalButtonText}>OK</Text>
-                        </Pressable>
+                        )}
                     </View>
                 </View>
             </Modal>
 
             <View style={[styles.container, isWideScreen && styles.containerWide]}>
                 <Text style={[styles.title, isWideScreen && styles.titleWide]}>Connexion / Inscription</Text>
-                <Text style={[styles.subtitle, isWideScreen && styles.subtitleWide]}>Entrez votre numéro WhatsApp pour commencer.</Text>
+                <Text style={[styles.subtitle, isWideScreen && styles.subtitleWide]}>Entrez votre adresse email pour commencer.</Text>
                 <TextInput
                     style={[styles.input, isWideScreen && styles.inputWide]}
-                    placeholder="Numéro WhatsApp (ex: +33612345678)"
-                    value={phoneNumber}
-                    onChangeText={setPhoneNumber}
-                    keyboardType="phone-pad"
-                    autoComplete="tel"
-                    textContentType="telephoneNumber"
+                    placeholder="Votre adresse email"
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoComplete="email"
+                    textContentType="emailAddress"
                     autoCapitalize="none"
                     placeholderTextColor="#888"
                 />
@@ -281,4 +283,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default PhoneNumberScreen; 
+export default EmailAuthScreen; 

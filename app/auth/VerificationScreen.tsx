@@ -1,332 +1,183 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, ActivityIndicator, Linking, useWindowDimensions, Platform, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Button, ActivityIndicator, useWindowDimensions, Platform, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { checkUserVerification } from '../../lib/supabase'; // Adjust path as needed
-import { useAuth } from '@/providers/AuthProvider'; // Corrected path
-import { Colors } from '../../constants/Colors'; // Assuming you have this
-import { useColorScheme } from '@/hooks/useColorScheme'; // Ensure this is imported
-
-const VERIFICATION_WA_LINK = 'https://wa.me/22958082628?text=confirmer';
-const POLLING_INTERVAL = 5000; // 5 seconds
+import { checkUserVerification, setUserVerified } from '../../lib/supabase';
+import { useAuth, WhatsAppUser } from '@/providers/AuthProvider';
+import { Colors } from '../../constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 const VerificationScreen = () => {
-    const params = useLocalSearchParams<{ userId?: string; phoneNumber?: string }>();
-    const { userId, phoneNumber } = params;
+    const params = useLocalSearchParams<{ userId?: string; email?: string }>();
+    const { userId } = params;
     const router = useRouter();
-    const auth = useAuth(); // Use the hook, variable is now 'auth'
-
-    const [isLoadingInitial, setIsLoadingInitial] = useState(true);
-    const [isAwaitingWhatsApp, setIsAwaitingWhatsApp] = useState(false);
-    const [statusMessage, setStatusMessage] = useState('Please confirm your number via WhatsApp.');
-
+    const auth = useAuth();
     const { width } = useWindowDimensions();
-    const isWideScreen = width > 768;
-    const colorScheme = useColorScheme() ?? 'light'; // Define colorScheme here
-    const styles = getThemedStyles(colorScheme, width); // Pass defined colorScheme and width
+    const colorScheme = useColorScheme() ?? 'light';
+    const styles = getThemedStyles(colorScheme, width);
 
-    // Modal State
-    const [modalVisible, setModalVisible] = useState(false);
-    const [modalTitle, setModalTitle] = useState('');
-    const [modalMessage, setModalMessage] = useState('');
-    const [modalOkAction, setModalOkAction] = useState(() => () => {});
-
-    // Helper to show modal
-    const showModal = (title: string, message: string, onOkPress?: () => void) => {
-        setModalTitle(title);
-        setModalMessage(message);
-        setModalOkAction(() => onOkPress ? () => { onOkPress(); setModalVisible(false); } : () => setModalVisible(false));
-        setModalVisible(true);
-    };
+    const [code, setCode] = useState('');
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (!userId) {
-            showModal('Error', 'User ID missing. Returning.', () => {
-                if (router.canGoBack()) router.back(); else router.replace('/auth/PhoneNumberScreen');
-            });
+            Alert.alert("Erreur", "ID utilisateur manquant. Vous allez être redirigé.", [{ text: "OK", onPress: () => router.replace('/auth/EmailAuthScreen' as any) }]);
+        }
+    }, [userId, router]);
+
+    const handleValidate = async () => {
+        if (code.length !== 6) {
+            Alert.alert('Erreur', 'Veuillez entrer un code à 6 chiffres.');
             return;
         }
-        setIsLoadingInitial(false);
 
-        const intervalId = setInterval(async () => {
-            if (isAwaitingWhatsApp) { 
-                console.log('Polling for verification status for userId:', userId);
-                try {
-                    const { data: userData, error } = await checkUserVerification(userId);
-                    if (error) {
-                        console.warn('Polling error:', error.message);
-                        return;
-                    }
-
-                    if (userData && userData.is_verified && userData.auth_token) {
-                        clearInterval(intervalId);
-                        setIsAwaitingWhatsApp(false);
-                        setStatusMessage('Number verified successfully!');
-                        
-                        localStorage.setItem('userToken', userData.auth_token);
-                        localStorage.setItem('userId', userId);
-
-                        if (auth && auth.signInUser) { 
-                            auth.signInUser(userData);
-                        } else {
-                            console.warn('Auth object or signInUser method not available.');
-                            showModal('Login Error', 'Could not complete login process. Please restart the app.');
-                        }
-                        
-                        // Check if additional info is needed before redirecting from VerificationScreen
-                        if (userData.nom && userData.email) {
-                            if (!modalVisible) { // Ensure modal isn't trying to show something else
-                               router.replace('/(tabs)/chat'); 
-                            }
-                        } else {
-                            if (!modalVisible) {
-                                router.replace({
-                                    pathname: '/auth/AdditionalInfoScreen',
-                                    params: {
-                                        userId: userId, // userId from VerificationScreen params
-                                        authToken: userData.auth_token,
-                                        phoneNumber: phoneNumber, // phoneNumber from VerificationScreen params
-                                        currentNom: userData.nom || '',
-                                        // Add currentEmail if AdditionalInfoScreen uses it, otherwise it's optional
-                                        // currentEmail: userData.email || '' 
-                                    }
-                                });
-                            }
-                        }
-                    }
-                } catch (e: any) {
-                    console.warn('Exception during polling:', e.message);
-                }
-            }
-        }, POLLING_INTERVAL);
-
-        return () => clearInterval(intervalId);
-    }, [userId, router, auth, isAwaitingWhatsApp, modalVisible]);
-
-    const handleConfirmViaWhatsApp = async () => {
-        // The phoneNumber prop is for the user being verified, not the target of the WhatsApp message.
-        // The link is fixed to VERIFICATION_WA_LINK.
-        const url = VERIFICATION_WA_LINK;
+        setLoading(true);
         try {
-            const supported = await Linking.canOpenURL(url);
-            if (supported) {
-                await Linking.openURL(url);
-                setStatusMessage('Check WhatsApp to confirm. Then return to this screen.');
-                setIsAwaitingWhatsApp(true); 
-            } else {
-                showModal('Error', 'Cannot open WhatsApp. Is it installed?');
+            // 1. Récupérer les infos utilisateur, y compris l'auth_token
+            const { data: userData, error: fetchError } = await checkUserVerification(userId!);
+            if (fetchError || !userData || !userData.auth_token) {
+                Alert.alert('Erreur', fetchError?.message || "Impossible de récupérer les informations de l'utilisateur.");
+                setLoading(false);
+                return;
             }
-        } catch (err) {
-            showModal('Error', 'Failed to open WhatsApp.');
+
+            // 2. Comparer le code
+            const expectedCode = userData.auth_token.slice(-6);
+            if (code !== expectedCode) {
+                Alert.alert('Code Invalide', 'Le code que vous avez entré est incorrect.');
+                setLoading(false);
+                return;
+            }
+
+            // 3. Mettre à jour is_verified à true
+            const { data: verifiedUserData, error: verificationError } = await setUserVerified(userId!);
+            if (verificationError || !verifiedUserData) {
+                Alert.alert('Erreur', verificationError?.message || "Une erreur est survenue lors de la validation.");
+                setLoading(false);
+                return;
+            }
+
+            // 4. Connecter l'utilisateur et rediriger
+            const expirationTime = new Date().getTime() + 30 * 24 * 60 * 60 * 1000; // 30 jours en millisecondes
+            localStorage.setItem('tokenExpiration', expirationTime.toString());
+            localStorage.setItem('userToken', verifiedUserData.auth_token);
+            localStorage.setItem('userId', verifiedUserData.id);
+            auth.signInUser(verifiedUserData as WhatsAppUser);
+
+            if (verifiedUserData.nom && verifiedUserData.email) {
+                router.replace('/(tabs)/chat');
+            } else {
+                router.replace({
+                    pathname: '/auth/AdditionalInfoScreen',
+                    params: {
+                        userId: verifiedUserData.id,
+                        authToken: verifiedUserData.auth_token,
+                        currentNom: verifiedUserData.nom || '',
+                    }
+                });
+            }
+        } catch (e: any) {
+            Alert.alert('Erreur Inattendue', e.message || 'Une erreur inconnue est survenue.');
+        } finally {
+            setLoading(false);
         }
     };
 
-    if (isLoadingInitial) {
-        return (
-            <View style={styles.outerContainer}>
-                <ActivityIndicator size="large" color={styles.tintColor.color} />
-                <Text style={[styles.statusText, isWideScreen && styles.statusTextWide]}>Loading...</Text>
-            </View>
-        );
-    }
-
     return (
         <View style={styles.outerContainer}>
-            <Modal
-                animationType="fade"
-                transparent={true}
-                visible={modalVisible}
-                onRequestClose={() => {
-                    setModalVisible(false);
-                }}
-            >
-                <View style={styles.centeredView}>
-                    <View style={styles.modalView}>
-                        <Text style={styles.modalTitleText}>{modalTitle}</Text>
-                        <Text style={styles.modalMessageText}>{modalMessage}</Text>
-                        <Pressable
-                            style={[styles.modalButton, styles.buttonConfirm]}
-                            onPress={modalOkAction} 
-                        >
-                            <Text style={styles.modalButtonText}>OK</Text>
-                        </Pressable>
-                    </View>
-                </View>
-            </Modal>
+            <View style={[styles.container, width > 768 && styles.containerWide]}>
+                <Text style={[styles.title, width > 768 && styles.titleWide]}>Vérifiez votre compte</Text>
+                
+                <Text style={[styles.statusText, width > 768 && styles.statusTextWide]}>
+                    Veuillez entrer le code à 6 chiffres que vous avez reçu pour finaliser votre inscription.
+                </Text>
 
-            <View style={[styles.container, isWideScreen && styles.containerWide]}>
-                <Text style={[styles.title, isWideScreen && styles.titleWide]}>Confirmer Votre Numero</Text>
-                <Text style={[styles.statusText, isWideScreen && styles.statusTextWide]}>{statusMessage}</Text>
-            
-                {!isAwaitingWhatsApp && (
-                    <View style={[styles.buttonContainer, isWideScreen && styles.buttonContainerWide]}>
-                        <Button 
-                            title="Open WhatsApp to Confirm"
-                            onPress={handleConfirmViaWhatsApp} 
+                <TextInput
+                    style={styles.input}
+                    value={code}
+                    onChangeText={setCode}
+                    placeholder="_ _ _ _ _ _"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    textAlign="center"
+                    placeholderTextColor="#aaa"
+                />
+
+                {loading ? (
+                    <ActivityIndicator size="large" color={styles.tintColor.color} style={{ marginTop: 20 }} />
+                ) : (
+                    <View style={styles.buttonContainer}>
+                        <Button
+                            title="Valider"
+                            onPress={handleValidate}
                             color={styles.tintColor.color}
                         />
                     </View>
                 )}
 
-                {isAwaitingWhatsApp && (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={styles.tintColor.color} />
-                        <Text style={[styles.loadingText, isWideScreen && styles.loadingTextWide]}>Waiting for your confirmation in WhatsApp...</Text>
-                    </View>
-                )}
+                <Text style={[styles.tipText, width > 768 && styles.tipTextWide]}>
+                    Si vous n'avez pas reçu de code, veuillez vérifier vos spams ou retourner à l'écran précédent pour réessayer.
+                </Text>
 
-                <View style={[styles.tipContainer, isWideScreen && styles.tipContainerWide]}>
-                    <Text style={[styles.tipText, isWideScreen && styles.tipTextWide]}>
-                        After sending "confirmer" on WhatsApp, please return to this page. Verification is automatic.
-                    </Text>
+                <View style={[styles.buttonContainer, { marginTop: 10 }]}>
+                    <Button 
+                        title="Retour"
+                        onPress={() => router.replace('/auth/EmailAuthScreen' as any)}
+                        color="#888" // Softer color for secondary action
+                    />
                 </View>
             </View>
         </View>
     );
 };
 
-// Renamed to avoid conflict if this file defines its own `getStyles` for other purposes
 const getThemedStyles = (scheme: 'light' | 'dark', screenWidth: number) => { 
-    const colors = Colors[scheme]; // Use the passed scheme to get colors
+    const colors = Colors[scheme];
     const isWideScreen = screenWidth > 768;
 
     return StyleSheet.create({
-        outerContainer: {
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: 20,
-            backgroundColor: colors.background,
-        },
-        container: {
-            width: '100%',
-            maxWidth: 500,
-            alignItems: 'center',
-            padding: Platform.select({ web: 0, default: 0}),
-        },
-        containerWide: {
-            padding: Platform.select({web: 40, default: 20}),
-            backgroundColor: colors.card,
-            borderRadius: Platform.select({web: 12, default: 0}),
-            boxShadow: Platform.select({web: '0 4px 8px rgba(0,0,0,0.1)', default: undefined }) as any,
-        },
-        title: {
-            fontSize: isWideScreen ? 28 : 20, // Adjusted for consistency
-            fontWeight: 'bold',
-            marginBottom: 20,
-            textAlign: 'center',
-            color: colors.text,
-        },
-        titleWide: {
-            fontSize: 28, // This was already here, kept for explicit wide screen
-        },
+        outerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: colors.background },
+        container: { width: '100%', maxWidth: 500, alignItems: 'center', padding: Platform.select({ web: 0, default: 0 }) },
+        containerWide: { padding: Platform.select({ web: 40, default: 20 }), backgroundColor: colors.card, borderRadius: Platform.select({ web: 12, default: 0 }), boxShadow: Platform.select({ web: '0 4px 8px rgba(0,0,0,0.1)', default: undefined }) as any },
+        title: { fontSize: isWideScreen ? 28 : 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: colors.text },
+        titleWide: { fontSize: 28 },
         statusText: {
-            fontSize: isWideScreen ? 17 : 14,
+            fontSize: isWideScreen ? 18 : 16,
             textAlign: 'center',
             marginBottom: 25,
             color: colors.text,
             paddingHorizontal: 10,
+            lineHeight: 24,
         },
-        statusTextWide: {
-            fontSize: 17, // Kept for explicit wide screen
+        statusTextWide: { fontSize: 18 },
+        input: {
+            height: 60,
+            width: '80%',
+            maxWidth: 300,
+            borderColor: '#ccc',
+            borderWidth: 1,
+            borderRadius: 8,
+            fontSize: 24,
+            backgroundColor: '#fff',
+            color: '#333',
+            letterSpacing: 10,
+            marginBottom: 20,
         },
         buttonContainer: {
-            width: '90%',
-            marginVertical: 20,
-        },
-        buttonContainerWide: {
             width: '80%',
-            maxWidth: 350,
-        },
-        loadingContainer: {
-            alignItems: 'center',
-            marginVertical: 30,
-        },
-        loadingText: {
-            marginTop: 15,
-            fontSize: isWideScreen ? 16 : 14,
-            color: colors.text,
-        },
-        loadingTextWide: {
-            fontSize: 16, // Kept for explicit wide screen
-        },
-        tipContainer: {
-            marginTop: 25,
-            paddingHorizontal: 15,
-            width: '100%',
-        },
-        tipContainerWide: {
-            marginTop: 40,
+            maxWidth: 300,
+            marginVertical: 10,
         },
         tipText: {
             fontSize: isWideScreen ? 14 : 12,
             textAlign: 'center',
-            color: '#777', // Could be themed: colors.textSecondary or similar
+            color: '#777',
             fontStyle: 'italic',
+            marginTop: 'auto',
+            paddingTop: 20,
         },
-        tipTextWide: {
-            fontSize: 14, // Kept for explicit wide screen
-        },
-        tintColor: { // Used for ActivityIndicator and Button color
-            color: colors.tint 
-        },
-        // Modal Styles
-        centeredView: {
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'rgba(0,0,0,0.4)', 
-        },
-        modalView: {
-            margin: 20,
-            backgroundColor: colors.card, 
-            borderRadius: 10,
-            padding: 25,
-            alignItems: 'center',
-            shadowColor: '#000',
-            shadowOffset: {
-                width: 0,
-                height: 2,
-            },
-            shadowOpacity: 0.25,
-            shadowRadius: 4,
-            elevation: 5,
-            width: Platform.OS === 'web' ? '50%' : '85%', 
-            maxWidth: 400,
-            borderColor: colors.borderColor,
-            borderWidth: 1,
-        },
-        modalTitleText: {
-            marginBottom: 15,
-            textAlign: 'center',
-            fontSize: isWideScreen ? 19 : 18,
-            fontWeight: 'bold',
-            color: colors.textPrimary, // Use themed primary text color
-        },
-        modalMessageText: {
-            marginBottom: 20,
-            textAlign: 'center',
-            fontSize: isWideScreen ? 17 : 16,
-            color: colors.text, 
-            lineHeight: 22,
-        },
-        modalButton: { 
-            borderRadius: 8,
-            paddingVertical: 12,
-            paddingHorizontal: 20,
-            elevation: 2,
-            width: '100%', 
-            alignItems: 'center',
-        },
-        buttonConfirm: { 
-            backgroundColor: colors.tint, 
-        },
-        modalButtonText: { 
-            color: colors.buttonText, // Use themed button text color
-            fontWeight: 'bold',
-            textAlign: 'center',
-            fontSize: isWideScreen ? 16 : 15,
-        },
+        tipTextWide: { fontSize: 14 },
+        tintColor: { color: colors.tint },
     });
 };
 
-export default VerificationScreen; 
+export default VerificationScreen;

@@ -71,7 +71,8 @@ function InitialLayout() {
   return (
     <Stack>
       <Stack.Screen name="welcome" options={{ headerShown: false }} />
-      <Stack.Screen name="auth/PhoneNumberScreen" options={{ headerShown: false }} />
+      <Stack.Screen name="auth/auth" options={{ headerShown: false }} />
+      <Stack.Screen name="auth/EmailAuthScreen" options={{ headerShown: false }} />
       <Stack.Screen name="auth/VerificationScreen" options={{ headerShown: false }} />
       <Stack.Screen name="auth/AdditionalInfoScreen" options={{ title: "Complétez Votre Profil", headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

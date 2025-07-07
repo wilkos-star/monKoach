@@ -22,12 +22,8 @@ export default function WelcomeScreen() {
           Un assistant IA pour t'accompagner pas à pas, avec un plan sur-mesure et un vrai suivi dans l'acquisition de tes compétences
         </Text>
 
-        <TouchableOpacity 
-          style={[styles.button, isWideScreen && styles.buttonWide]} 
-          onPress={() => router.push('/auth/PhoneNumberScreen')}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.buttonText, isWideScreen && styles.buttonTextWide]}>Commencer mon parcours</Text>
+        <TouchableOpacity style={styles.button} onPress={() => router.push('/auth/EmailAuthScreen' as any)}>
+          <Text style={styles.buttonText}>Commencer avec mon koach</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -376,6 +376,47 @@ export async function upsertUserByPhoneNumber(phoneNumber: string) {
     }
 }
 
+// Check if user exists by email, or create one
+export async function upsertUserByEmail(email: string) {
+    try {
+        // 1. Check if user exists
+        let { data: existingUser, error: fetchError } = await supabase
+            .from('users')
+            .select('id, auth_token, is_verified, phone_number, nom, email')
+            .eq('email', email)
+            .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116: single row expected, 0 found
+            console.error('Error fetching user by email:', fetchError);
+            return { data: null, error: fetchError };
+        }
+
+        if (existingUser) {
+            // User exists, return their info
+            return { data: existingUser, error: null };
+        } else {
+            // User does not exist, create them.
+            const { data: newUser, error: insertError } = await supabase
+                .from('users')
+                .insert({
+                    email: email,
+                    is_verified: false,
+                })
+                .select('id, auth_token, is_verified, phone_number, nom, email')
+                .single();
+
+            if (insertError) {
+                console.error('Error creating new user via email:', insertError);
+                return { data: null, error: insertError };
+            }
+            return { data: newUser, error: null };
+        }
+    } catch (error) {
+        console.error('Unexpected error in upsertUserByEmail:', error);
+        return { data: null, error: error instanceof Error ? error : new Error('Unknown error') };
+    }
+}
+
 // Check a user's verification status and get their auth_token
 export async function checkUserVerification(userId: string) {
     if (!userId) {
@@ -445,5 +486,29 @@ export async function updateUserProfile(userId: string, { nom, email }: { nom?: 
     }
     
     return { data, error };
+}
+
+// Set a user's status to verified
+export async function setUserVerified(userId: string) {
+    if (!userId) {
+        console.error('User ID is required to verify user');
+        return { data: null, error: { message: 'User ID manquant' } };
+    }
+    try {
+        const { data, error } = await supabase
+            .from('users')
+            .update({ is_verified: true, updated_at: new Date().toISOString() })
+            .eq('id', userId)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error setting user as verified:', error);
+        }
+        return { data, error };
+    } catch (error) {
+        console.error('Unexpected error in setUserVerified:', error);
+        return { data: null, error: error instanceof Error ? error : new Error('Unknown error') };
+    }
 }
   

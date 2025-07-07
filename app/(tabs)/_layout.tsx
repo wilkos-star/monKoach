@@ -29,9 +29,10 @@ export default function TabLayout() {
     //   console.log('(tabs)/_layout: User profile incomplete, redirecting to AdditionalInfoScreen from:', pathname, user);
     //   router.replace('/auth/AdditionalInfoScreen');
     // } else 
-    if (!user && pathname !== '/auth/PhoneNumberScreen' && pathname !== '/auth/VerificationScreen' && pathname !== '/auth/AdditionalInfoScreen' && pathname !== '/auth/auth') {
+    if (!user && pathname !== '/auth/EmailAuthScreen' && pathname !== '/auth/VerificationScreen' && pathname !== '/auth/AdditionalInfoScreen' && pathname !== '/auth/auth') {
       // Ce console.log est utile pour le débogage, pour s'assurer que le layout racine gère bien la redirection des non-connectés.
       console.log('(tabs)/_layout: No user, not on auth screen. Root layout should handle redirection to login.', pathname);
+      router.replace('/welcome');
     }
   }, [user, loading, router, pathname]);
 

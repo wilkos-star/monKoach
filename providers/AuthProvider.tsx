@@ -25,7 +25,7 @@ export interface AuthProviderValue {
     loading: boolean;
     signInUser: (userData: WhatsAppUser) => void; // Changed from Promise<void> to void
     signOutUser: () => void; // Changed from Promise<void> to void
-    // We no longer need signUp in the old sense, it's handled by PhoneNumberScreen -> upsertUserByPhoneNumber
+    // We no longer need signUp in the old sense, it's handled by EmailAuthScreen -> upsertUserByEmail
 }
 
 const AuthContext = createContext<AuthProviderValue | null>(null); // Initialize with null
@@ -50,8 +50,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const loadUserFromStorage = () => { // Make synchronous
             setLoading(true);
             try {
-                const storedUserId = localStorage.getItem('userId'); // Use localStorage
-                const storedUserToken = localStorage.getItem('userToken'); // Use localStorage
+                const storedUserId = localStorage.getItem('userId');
+                const storedUserToken = localStorage.getItem('userToken');
+                const tokenExpiration = localStorage.getItem('tokenExpiration');
+
+                // 1. Vérifier l'expiration avant tout
+                if (tokenExpiration && new Date().getTime() > parseInt(tokenExpiration)) {
+                    console.log('(AuthProvider) Token has expired. Clearing credentials.');
+                    clearStoredCredentials();
+                    setLoading(false);
+                    return; // Arrêter le processus
+                }
 
                 if (storedUserId && storedUserToken) {
                     console.log('(AuthProvider) Found stored credentials, verifying...', { storedUserId });
@@ -104,6 +113,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('(AuthProvider) Clearing stored credentials and setting user to null.');
         localStorage.removeItem('userId'); // Use localStorage
         localStorage.removeItem('userToken'); // Use localStorage
+        localStorage.removeItem('tokenExpiration'); // Important: aussi supprimer l'expiration
         setUser(null);
     };
 

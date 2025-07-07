@@ -12,7 +12,6 @@ const AdditionalInfoScreen = () => {
     const { width } = useWindowDimensions();
 
     const [fullName, setFullName] = useState(params.currentNom || '');
-    const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
 
     // Modal State
@@ -32,39 +31,34 @@ const AdditionalInfoScreen = () => {
     };
 
     useEffect(() => {
-        if (!params.userId || !params.authToken || !params.phoneNumber) {
-            showModal('Erreur', "Données utilisateur incomplètes. Impossible de continuer.", () => router.replace('/auth/PhoneNumberScreen'));
-            // router.replace might be called before modal is seen, consider modal interaction first
+        if (!params.userId || !params.authToken) {
+            showModal('Erreur', "Données utilisateur incomplètes. Impossible de continuer.", () => router.replace('/auth/EmailAuthScreen' as any));
+            return;
         }
     }, [params, router]);
 
     const handleSubmit = async () => {
-        if (!params.userId || !params.authToken || !params.phoneNumber) {
-            showModal('Erreur', "Les informations de session sont manquantes.");
+        if (!params.userId || !params.authToken) {
+            showModal('Erreur', "Données utilisateur incomplètes. Impossible de continuer.", () => router.replace('/auth/EmailAuthScreen' as any));
             return;
         }
         if (!fullName.trim()) {
             showModal('Champ Requis', 'Veuillez entrer votre nom complet.');
             return;
         }
-        if (!email.trim()) {
-            showModal('Champ Requis', 'Veuillez entrer votre adresse e-mail.');
-            return;
-        }
-        if (!/\S+@\S+\.\S+/.test(email)) {
-            showModal('Email Invalide', 'Veuillez entrer une adresse e-mail valide.');
-            return;
-        }
 
         setLoading(true);
         try {
-            const { data: updatedUserData, error } = await updateUserProfile(params.userId, { nom: fullName, email });
+            const { data: updatedUserData, error } = await updateUserProfile(params.userId, { nom: fullName.trim() });
 
             if (error || !updatedUserData) {
                 showModal('Erreur de Mise à Jour', error?.message || 'Impossible de sauvegarder les informations.');
             } else {
                 localStorage.setItem('userId', updatedUserData.id);
                 localStorage.setItem('userToken', updatedUserData.auth_token);
+                // On ajoute la date d'expiration ici aussi pour être complet
+                const expirationTime = new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
+                localStorage.setItem('tokenExpiration', expirationTime.toString());
                 
                 auth.signInUser(updatedUserData as WhatsAppUser);
                 showModal('Succès', 'Vos informations ont été enregistrées.', () => router.replace({ pathname: '/(tabs)/chat', params: { fromProfileCompletion: 'true' } }));
@@ -112,16 +106,6 @@ const AdditionalInfoScreen = () => {
                     onChangeText={setFullName}
                     autoCapitalize="words"
                     textContentType="name"
-                    placeholderTextColor="#888"
-                />
-                <TextInput
-                    style={styles.input}
-                    placeholder="Adresse Email"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    textContentType="emailAddress"
                     placeholderTextColor="#888"
                 />
                 {loading ? (
